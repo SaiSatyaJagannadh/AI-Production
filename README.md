@@ -1,4 +1,82 @@
-# AI in Production
+<div align="center">
+
+# 🚀 AI in Production — my build log
+
+### Shipping Gen AI apps all the way to a real URL: Vercel → Docker → Amazon ECR → AWS Lambda.
+
+[![Live Demo](https://img.shields.io/badge/▶_Live_Demo-MediNotes_Pro-0e7c74?style=for-the-badge)](https://55ncfzx5whditvl2364jsjk3gy0twvlw.lambda-url.us-east-2.on.aws/)
+[![AWS Lambda](https://img.shields.io/badge/Running_on-AWS_Lambda-FF9900?style=for-the-badge&logo=awslambda&logoColor=white)](https://aws.amazon.com/lambda/)
+[![Read the build](https://img.shields.io/badge/📖_Full_writeup-saas%2FREADME-6C47FF?style=for-the-badge)](saas/README.md)
+
+</div>
+
+## 🩺 The flagship project — MediNotes Pro
+
+**Live 👉 https://55ncfzx5whditvl2364jsjk3gy0twvlw.lambda-url.us-east-2.on.aws/**
+
+A clinician pastes the shorthand they typed during a consultation. Twenty seconds later they have three finished drafts, streamed in live and each with its own copy button:
+
+| | |
+|---|---|
+| 📋 **Summary of visit** | a structured entry for the patient record |
+| ✅ **Next steps** | follow-ups, labs and medication changes as a checklist |
+| ✉️ **Patient email** | the same visit, in language a patient actually reads |
+
+One Docker image serves **both** the static Next.js frontend and the streaming FastAPI backend, behind a single AWS Lambda Function URL — so it scales to zero and costs per consultation, not per hour.
+
+```
+Next.js 16 static export  →  FastAPI + SSE  →  Lambda Web Adapter (response_stream)
+        Clerk JWT + subscription gating  ·  OpenAI gpt-5-nano  ·  ECR container image
+```
+
+📖 **Architecture diagrams, the deploy pipeline and the three bugs that cost me an evening: [`saas/README.md`](saas/README.md)**
+
+### 🗺️ What's in this repo
+
+| Folder | What it is |
+|---|---|
+| [`saas/`](saas/) | 🩺 **MediNotes Pro** — the full-stack app above (Next.js + FastAPI + Docker + Lambda) |
+| [`instant/`](instant/) | ⚡ Production deploy in under 10 minutes — a single FastAPI file on Vercel |
+| [`finale/`](finale/) | 🤖 Agents on AWS Bedrock AgentCore with Strands (tools, code interpreter, observability) |
+| [`week1/`](week1/) – [`week4/`](week4/) | 📓 The day-by-day guides I worked through |
+| [`guides/`](guides/) | 🧰 Setup and foundations notebooks |
+
+<details>
+<summary>💼 <b>The LinkedIn version of this post</b> (click to expand / copy)</summary>
+
+<br/>
+
+I just shipped an AI app the whole way to production — not a notebook, a URL. 🚀
+
+**MediNotes Pro** turns a doctor's shorthand consultation notes into three finished pieces of work: a structured record summary, an actionable follow-up checklist, and a patient-friendly email draft. All three stream in live, token by token.
+
+Try it 👉 https://55ncfzx5whditvl2364jsjk3gy0twvlw.lambda-url.us-east-2.on.aws/
+
+What's under the hood:
+🔹 Next.js 16 + React 19 + Tailwind v4, compiled to a static export
+🔹 FastAPI streaming Server-Sent Events from OpenAI
+🔹 One multi-stage Docker image serving frontend *and* API — no CORS, one URL, one bill
+🔹 Pushed to Amazon ECR and run as an AWS Lambda container image, so it scales to zero
+🔹 Clerk for auth, JWT verification and subscription gating — the token is checked before a single model token is spent
+
+Three things that cost me an evening, in case they save you one:
+1️⃣ Lambda buffers responses by default — streaming only works with the Lambda Web Adapter in `response_stream` mode
+2️⃣ SSE strips newlines, so markdown arrives as one giant paragraph until you re-encode them
+3️⃣ On Apple Silicon you must build `--platform linux/amd64 --provenance=false` or Lambda rejects the image
+
+Biggest lesson: "it works locally" and "it works in production" are two different engineering problems, and the second one is where the learning is. 💡
+
+⚠️ Demonstration project — not a medical device. Every output is a draft for a clinician to review and sign off.
+
+#AI #AWS #Lambda #Serverless #NextJS #FastAPI #Docker #GenAI #MachineLearning #BuildInPublic
+
+</details>
+
+---
+
+<br/>
+
+# 📚 The course this repo is built from
 
 ## Deploy Gen AI and Agentic AI at Scale in 4 weeks
 
