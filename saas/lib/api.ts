@@ -33,6 +33,8 @@ export type Stats = {
   emailed: number;
   last_7_days: number;
   email_configured: boolean;
+  /** Which SMTP settings the server is still waiting for, e.g. ["SMTP_PASSWORD"]. */
+  email_missing?: string[];
 };
 
 type GetToken = () => Promise<string | null>;

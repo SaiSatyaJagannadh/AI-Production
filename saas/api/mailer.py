@@ -28,8 +28,23 @@ class EmailNotConfigured(RuntimeError):
     pass
 
 
+def missing_config() -> list[str]:
+    """Which SMTP settings still need to be supplied."""
+    missing = []
+    if not SMTP_HOST:
+        missing.append("SMTP_HOST")
+    if not SMTP_FROM:
+        missing.append("SMTP_FROM")
+    # A relay that identifies a user must also have that user's password —
+    # without it the send fails at the relay instead of here, which reads as a
+    # mystery 502 in the UI.
+    if SMTP_USER and not SMTP_PASSWORD:
+        missing.append("SMTP_PASSWORD")
+    return missing
+
+
 def is_configured() -> bool:
-    return bool(SMTP_HOST and SMTP_FROM)
+    return not missing_config()
 
 
 def markdown_to_html(text: str) -> str:
@@ -98,9 +113,10 @@ def build_message(to: str, subject: str, body: str, clinician: str = "") -> Emai
 
 def send(to: str, subject: str, body: str, clinician: str = "") -> None:
     """Send one patient email. Raises EmailNotConfigured or smtplib errors."""
-    if not is_configured():
+    missing = missing_config()
+    if missing:
         raise EmailNotConfigured(
-            "SMTP is not configured — set SMTP_HOST, SMTP_FROM and credentials."
+            f"SMTP is not configured — still missing: {', '.join(missing)}."
         )
 
     message = build_message(to, subject, body, clinician)

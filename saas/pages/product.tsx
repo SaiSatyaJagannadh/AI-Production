@@ -119,6 +119,7 @@ function EmailComposer({
   defaultTo,
   dateOfVisit,
   emailConfigured,
+  emailMissing,
   onSent,
 }: {
   consultationId: number;
@@ -126,6 +127,7 @@ function EmailComposer({
   defaultTo: string;
   dateOfVisit: string;
   emailConfigured: boolean;
+  emailMissing?: string[];
   onSent: () => void;
 }) {
   const { getToken } = useAuth();
@@ -204,8 +206,9 @@ function EmailComposer({
 
       {!emailConfigured && (
         <Alert kind="error">
-          SMTP is not configured on the server, so sending will fail. Set SMTP_HOST, SMTP_FROM and
-          credentials in the environment.
+          Sending is disabled — the server is still missing{' '}
+          <code>{(emailMissing ?? ['SMTP_HOST', 'SMTP_FROM']).join(', ')}</code>. Set it on the
+          Lambda and this warning clears on the next page load.
         </Alert>
       )}
 
@@ -276,6 +279,7 @@ function DraftActions({
   patientEmail,
   dateOfVisit,
   emailConfigured,
+  emailMissing,
   onChanged,
 }: {
   consultationId: number;
@@ -284,6 +288,7 @@ function DraftActions({
   patientEmail: string;
   dateOfVisit: string;
   emailConfigured: boolean;
+  emailMissing?: string[];
   onChanged: () => void;
 }) {
   const { getToken } = useAuth();
@@ -368,6 +373,7 @@ function DraftActions({
           defaultTo={patientEmail}
           dateOfVisit={dateOfVisit}
           emailConfigured={emailConfigured}
+          emailMissing={emailMissing}
           onSent={onChanged}
         />
       )}
@@ -379,9 +385,11 @@ function DraftActions({
 
 function NewConsultation({
   emailConfigured,
+  emailMissing,
   onSaved,
 }: {
   emailConfigured: boolean;
+  emailMissing?: string[];
   onSaved: () => void;
 }) {
   const { getToken } = useAuth();
@@ -585,6 +593,7 @@ function NewConsultation({
                 patientEmail={patientEmail}
                 dateOfVisit={dateString}
                 emailConfigured={emailConfigured}
+                emailMissing={emailMissing}
                 onChanged={onSaved}
               />
             )}
@@ -600,11 +609,13 @@ function NewConsultation({
 function ConsultationDetail({
   id,
   emailConfigured,
+  emailMissing,
   onBack,
   onChanged,
 }: {
   id: number;
   emailConfigured: boolean;
+  emailMissing?: string[];
   onBack: () => void;
   onChanged: () => void;
 }) {
@@ -702,6 +713,7 @@ function ConsultationDetail({
           patientEmail={record.patient_email ?? ''}
           dateOfVisit={record.date_of_visit}
           emailConfigured={emailConfigured}
+          emailMissing={emailMissing}
           onChanged={() => {
             reload();
             onChanged();
@@ -731,10 +743,12 @@ function ConsultationDetail({
 
 function History({
   emailConfigured,
+  emailMissing,
   refreshKey,
   onChanged,
 }: {
   emailConfigured: boolean;
+  emailMissing?: string[];
   refreshKey: number;
   onChanged: () => void;
 }) {
@@ -771,6 +785,7 @@ function History({
       <ConsultationDetail
         id={selected}
         emailConfigured={emailConfigured}
+        emailMissing={emailMissing}
         onBack={() => setSelected(null)}
         onChanged={onChanged}
       />
@@ -885,11 +900,13 @@ function Workspace() {
       {tab === 'new' ? (
         <NewConsultation
           emailConfigured={stats?.email_configured ?? false}
+          emailMissing={stats?.email_missing}
           onSaved={refresh}
         />
       ) : (
         <History
           emailConfigured={stats?.email_configured ?? false}
+          emailMissing={stats?.email_missing}
           refreshKey={refreshKey}
           onChanged={refresh}
         />

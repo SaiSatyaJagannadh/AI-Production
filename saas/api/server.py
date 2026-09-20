@@ -220,7 +220,11 @@ def email_patient(
 @app.get("/api/stats")
 def get_stats(creds: HTTPAuthorizationCredentials = Depends(clerk_guard)):
     user_id, _ = current_user(creds)
-    return {**db.stats(user_id), "email_configured": mailer.is_configured()}
+    return {
+        **db.stats(user_id),
+        "email_configured": mailer.is_configured(),
+        "email_missing": mailer.missing_config(),
+    }
 
 
 @app.get("/health")
