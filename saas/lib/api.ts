@@ -73,7 +73,11 @@ export const api = {
   get: (getToken: GetToken, id: number) =>
     request<Consultation>(getToken, `/api/consultations/${id}`),
 
-  save: (getToken: GetToken, id: number, body: { summary?: string; patient_email?: string }) =>
+  save: (
+    getToken: GetToken,
+    id: number,
+    body: { summary?: string; patient_email?: string; sent_externally?: boolean },
+  ) =>
     request<{ status: string }>(getToken, `/api/consultations/${id}`, {
       method: 'PATCH',
       body: JSON.stringify(body),
@@ -116,6 +120,21 @@ export function splitSections(markdown: string): { title: string; body: string }
 export function patientEmailDraft(markdown: string): string {
   const section = splitSections(markdown).find((s) => s.title.toLowerCase().includes('email'));
   return section?.body.trim() ?? '';
+}
+
+/**
+ * mailto: / Gmail links for sending from the clinician's own mail client —
+ * the fallback when the server has no SMTP relay configured.
+ */
+export function composeLinks(to: string, subject: string, body: string) {
+  const query = (sep: string) =>
+    `${sep}subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  return {
+    mailto: `mailto:${encodeURIComponent(to)}?${query('').slice(1)}`,
+    gmail:
+      `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(to)}` +
+      `&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`,
+  };
 }
 
 export function formatDate(iso: string): string {

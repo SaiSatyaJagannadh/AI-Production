@@ -169,7 +169,8 @@ def update_consultation(user_id: str, consultation_id: int,
         raise
 
 
-def mark_emailed(user_id: str, consultation_id: int, recipient: str) -> None:
+def mark_emailed(user_id: str, consultation_id: int, recipient: str,
+                 detail: str = None) -> None:
     stamp = now()
     table().update_item(
         Key={"user_id": user_id, "id": consultation_id},
@@ -185,7 +186,7 @@ def mark_emailed(user_id: str, consultation_id: int, recipient: str) -> None:
             ":status": "emailed",
             ":stamp": stamp,
             ":email": recipient,
-            ":entry": [_audit_entry("email_sent", recipient)],
+            ":entry": [_audit_entry("email_sent", detail or recipient)],
             ":empty": [],
         },
     )

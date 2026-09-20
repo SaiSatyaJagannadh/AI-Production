@@ -49,6 +49,10 @@ class Visit(BaseModel):
 class ConsultationUpdate(BaseModel):
     summary: str | None = Field(None, max_length=40000)
     patient_email: str | None = Field(None, max_length=320)
+    # Set when the clinician sent the draft from their own mail client rather
+    # than through the server's relay — there is nothing to send here, only a
+    # status and an audit entry to record.
+    sent_externally: bool = False
 
 
 class EmailRequest(BaseModel):
@@ -169,6 +173,17 @@ def update_consultation(
         user_id, consultation_id, update.summary, update.patient_email
     ):
         raise HTTPException(status_code=404, detail="Consultation not found")
+
+    if update.sent_externally:
+        recipient = (update.patient_email or "").strip()
+        if not db.valid_email(recipient):
+            raise HTTPException(status_code=400, detail="A valid patient email is required")
+        db.mark_emailed(
+            user_id, consultation_id, recipient,
+            detail=f"{recipient} — sent from the clinician's own mail client",
+        )
+        return {"status": "marked_sent"}
+
     return {"status": "saved"}
 
 

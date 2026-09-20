@@ -11,6 +11,7 @@ import remarkBreaks from 'remark-breaks';
 import { fetchEventSource } from '@microsoft/fetch-event-source';
 import {
   api,
+  composeLinks,
   formatDate,
   patientEmailDraft,
   splitSections,
@@ -147,6 +148,9 @@ function EmailComposer({
     setBody(patientEmailDraft(summary));
   }
 
+  const canCompose = Boolean(to.trim()) && Boolean(body.trim());
+  const links = composeLinks(to, subject, body);
+
   async function send() {
     setSending(true);
     setError('');
@@ -161,6 +165,21 @@ function EmailComposer({
     }
   }
 
+  /** Record a send the clinician made from their own mail client. */
+  async function markSentExternally() {
+    setSending(true);
+    setError('');
+    try {
+      await api.save(getToken, consultationId, { patient_email: to, sent_externally: true });
+      setSent(to);
+      onSent();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not record the send.');
+    } finally {
+      setSending(false);
+    }
+  }
+
   if (sent) {
     return (
       <div className="rounded-2xl border border-accent/40 bg-accent-soft p-5">
@@ -169,7 +188,7 @@ function EmailComposer({
             strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5" aria-hidden="true">
             <path d="m5 13 4 4L19 7" />
           </svg>
-          Email sent to {sent}
+          {emailConfigured ? 'Email sent to' : 'Marked as emailed to'} {sent}
         </p>
         <p className="mt-1.5 text-sm text-muted">
           The consultation is marked as emailed and the send is recorded in its audit trail.
@@ -185,7 +204,7 @@ function EmailComposer({
           strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4" aria-hidden="true">
           <path d="M3 7a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Zm0 .5 9 6 9-6" />
         </svg>
-        Email this to the patient
+        {emailConfigured ? 'Email this to the patient' : 'Send this to the patient'}
       </button>
     );
   }
@@ -196,7 +215,9 @@ function EmailComposer({
         <div>
           <h3 className="font-semibold tracking-tight">Send to patient</h3>
           <p className="mt-1 text-sm text-muted">
-            Read it through — this goes to the patient as soon as you press send.
+            {emailConfigured
+              ? 'Read it through — this goes to the patient as soon as you press send.'
+              : 'Read it through, then open it in your mail client to send it yourself.'}
           </p>
         </div>
         <button type="button" onClick={() => setOpen(false)} className="btn-ghost">
@@ -205,11 +226,12 @@ function EmailComposer({
       </div>
 
       {!emailConfigured && (
-        <Alert kind="error">
-          Sending is disabled — the server is still missing{' '}
-          <code>{(emailMissing ?? ['SMTP_HOST', 'SMTP_FROM']).join(', ')}</code>. Set it on the
-          Lambda and this warning clears on the next page load.
-        </Alert>
+        <p className="rounded-lg border border-line bg-surface-2 px-3 py-2 text-sm text-muted">
+          The server has no mail relay configured
+          {emailMissing?.length ? <> (missing <code>{emailMissing.join(', ')}</code>)</> : null}, so
+          this opens the draft in your own mail client instead — it sends from your address, and
+          the patient can reply to you directly.
+        </p>
       )}
 
       <div className="space-y-1.5">
@@ -258,14 +280,50 @@ function EmailComposer({
 
       {error && <Alert kind="error">{error}</Alert>}
 
-      <button
-        type="button"
-        onClick={send}
-        disabled={sending || !to.trim() || !body.trim()}
-        className="btn-primary w-full justify-center"
-      >
-        {sending ? 'Sending…' : 'Send email now'}
-      </button>
+      {emailConfigured ? (
+        <button
+          type="button"
+          onClick={send}
+          disabled={sending || !to.trim() || !body.trim()}
+          className="btn-primary w-full justify-center"
+        >
+          {sending ? 'Sending…' : 'Send email now'}
+        </button>
+      ) : (
+        <div className="space-y-3">
+          <div className="flex flex-wrap gap-2">
+            <a
+              href={links.mailto}
+              className={`btn-primary flex-1 justify-center ${canCompose ? '' : 'pointer-events-none opacity-60'}`}
+            >
+              Open in mail app
+            </a>
+            <a
+              href={links.gmail}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={`btn-primary flex-1 justify-center ${canCompose ? '' : 'pointer-events-none opacity-60'}`}
+            >
+              Open in Gmail
+            </a>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <CopyButton text={body} label="Copy the message" />
+            <button
+              type="button"
+              onClick={markSentExternally}
+              disabled={sending || !canCompose}
+              className="btn-ghost"
+            >
+              {sending ? 'Saving…' : 'I sent it — mark as emailed'}
+            </button>
+          </div>
+          <p className="text-xs leading-relaxed text-muted">
+            Very long drafts can be truncated by some mail clients — use “Copy the message” and
+            paste if anything looks short.
+          </p>
+        </div>
+      )}
     </div>
   );
 }

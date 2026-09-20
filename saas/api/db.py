@@ -177,7 +177,8 @@ def update_consultation(user_id: str, consultation_id: int,
         return True
 
 
-def mark_emailed(user_id: str, consultation_id: int, recipient: str) -> None:
+def mark_emailed(user_id: str, consultation_id: int, recipient: str,
+                 detail: str = None) -> None:
     stamp = now()
     with connect() as conn:
         conn.execute(
@@ -185,7 +186,7 @@ def mark_emailed(user_id: str, consultation_id: int, recipient: str) -> None:
             " patient_email = ?, updated_at = ? WHERE id = ? AND user_id = ?",
             (stamp, recipient, stamp, consultation_id, user_id),
         )
-        log(conn, user_id, "email_sent", consultation_id, recipient)
+        log(conn, user_id, "email_sent", consultation_id, detail or recipient)
 
 
 def delete_consultation(user_id: str, consultation_id: int) -> bool:
