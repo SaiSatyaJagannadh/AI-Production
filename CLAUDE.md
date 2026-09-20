@@ -58,7 +58,7 @@ uv run agentcore invoke '{"prompt": "..."}'
 
 `--platform linux/amd64 --provenance=false` is not optional on Apple Silicon — Lambda rejects both an arm64 image and the provenance manifest.
 
-Backend self-check (no framework, asserts only — run it after touching `db.py`, `mailer.py` or the prompt):
+Backend self-check (no framework, asserts only — run after touching `db.py`, `mailer.py` or the prompt). It covers the SQLite backend, user scoping, email extraction and HTML escaping; `dynamo.py` has no offline test, so exercise it against the real table:
 
 ```bash
 cd saas && python3 api/test_db.py
@@ -72,20 +72,38 @@ There are no frontend tests.
 
 `saas/api/` holds two different FastAPI apps for two deploy targets:
 
-- **`api/server.py`** — the live one, with `api/db.py` (SQLite) and `api/mailer.py` (SMTP) beside it. Serves the whole API plus the static Next export mounted at `/`. This is what the Dockerfile copies and what Lambda runs.
+- **`api/server.py`** — the live one, with `api/db.py`, `api/dynamo.py` and `api/mailer.py` beside it. Serves the whole API plus the static Next export mounted at `/`. The Dockerfile copies those four files by name, so **a new module is invisible to the container until you add it to that COPY line**.
 - **`api/index.py`** — the earlier Vercel Python Serverless Function, reachable at `/api` (Vercel maps `api/index.py` → `/api`, so the route inside is declared `@app.post("/api")`, not `/`).
 
 `pages/product.tsx` posts to **`/api/consultation`**, which only `server.py` serves. On the Vercel deployment that path 404s (`/api` answers, `/api/consultation` does not). So the container/Lambda path is the working one; either update `api/index.py` and Vercel routing or treat Vercel as the marketing-site-only deploy.
 
-Endpoints, all guarded by the Clerk JWT: `POST /api/consultation` (stream + persist), `GET /api/consultations` (list, `?q=` searches patient name), `GET|PATCH|DELETE /api/consultations/{id}`, `POST /api/consultations/{id}/email`, `GET /api/stats`, `GET /health`.
+Endpoints, all guarded by the Clerk JWT: `POST /api/consultation` (stream + persist), `GET /api/consultations` (list, `?q=` searches patient name), `GET|PATCH|DELETE /api/consultations/{id}` (PATCH also takes `sent_externally`), `POST /api/consultations/{id}/email`, `GET /api/stats`, `GET /health`.
 
-### Persistence and email
+### Two storage backends, chosen at import
 
-`api/db.py` is stdlib `sqlite3` at `DB_PATH` (default `/tmp/medinotes.db`). **Every query takes the Clerk user id from the verified token and filters on it** — that scoping is the only thing standing between two clinicians' records, so never add a query without it. Tables: `consultations` and `audit_log` (generate / edit / email_sent / delete).
+`server.py` picks one at import time and nothing downstream changes, because both modules expose the same ten functions:
 
-The Lambda caveat: `/tmp` is per-container and is wiped on a cold start, so history is effectively a session cache in production. Point `DB_PATH` at an EFS mount for durable storage, or swap the six functions in `db.py` for DynamoDB. The Dockerfile sets the default.
+```python
+if os.getenv("DYNAMODB_TABLE"):
+    import dynamo as db
+else:
+    import db
+```
 
-`api/mailer.py` sends patient email over plain `smtplib` — any SMTP relay (SES, SendGrid, Postmark, Gmail app password) works via the `SMTP_*` variables. It is only ever reached from the email endpoint, which is only ever called by an explicit click in the UI; `is_configured()` drives a warning banner in the composer so a missing relay is visible before the clinician writes an email.
+- **`api/db.py`** — stdlib `sqlite3` at `DB_PATH` (default `/tmp/medinotes.db`). The local and test path.
+- **`api/dynamo.py`** — DynamoDB, partition key `user_id`, sort key `id` (a millisecond-based int, so a reverse query returns newest first and the value still fits JavaScript's safe integer range). The audit trail is a list attribute on the item, so a consultation is one read. boto3 returns `Decimal` for every number — `_plain()` converts before the response is serialized.
+
+**Every function in both takes the Clerk user id from the verified token and filters on it.** That scoping is the only thing standing between two clinicians' records, so never add a query without it; `test_db.py` asserts it.
+
+Why not EFS + SQLite, the obvious answer to "make it durable": mounting EFS requires the function to be in a VPC, and a VPC without a NAT gateway (~$32/month) has no route to `api.openai.com` or Clerk's JWKS endpoint. DynamoDB needs neither.
+
+### Email, and the fallback when there is no relay
+
+`api/mailer.py` sends over plain `smtplib` — any SMTP relay (SES, SendGrid, Postmark, a Gmail app password) via the `SMTP_*` variables. It is only ever reached from the email endpoint, which only an explicit click calls.
+
+`missing_config()` returns the list of settings still absent and drives everything user-facing: `/api/stats` returns it as `email_missing`, and the composer names them. It deliberately treats "`SMTP_USER` set but no `SMTP_PASSWORD`" as unconfigured — otherwise the UI reports ready and the send fails at the relay as an opaque 502.
+
+When no relay is configured the composer does not dead-end. It offers `mailto:` and Gmail compose links built by `composeLinks()` in `lib/api.ts`, and **`PATCH /api/consultations/{id}` with `sent_externally: true`** records a send the clinician made from their own mail client — nothing is transmitted, only a status change and an audit entry reading "sent from the clinician's own mail client" so it stays distinguishable from a relay send.
 
 ### Static export changes what's possible
 
@@ -120,10 +138,28 @@ Everything matching `.env*` is gitignored. `saas/.env` is the one the shell comm
 - `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` — build-time, baked into the export
 - `CLERK_SECRET_KEY`, `CLERK_JWKS_URL`, `OPENAI_API_KEY` — runtime, backend
 - `DEFAULT_AWS_REGION`, `AWS_ACCOUNT_ID` — used by the ECR/Lambda commands
-- `DB_PATH` — SQLite file (default `/tmp/medinotes.db`)
-- `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM`, `CLINIC_NAME` — patient email; unset means the send endpoint returns 503 and the UI warns up front
+- `DYNAMODB_TABLE` — set it and the app uses DynamoDB; unset and it uses SQLite
+- `DB_PATH` — SQLite file when DynamoDB is off (default `/tmp/medinotes.db`)
+- `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM`, `CLINIC_NAME` — patient email; incomplete means the send endpoint returns 503 and the composer falls back to the clinician's own mail client
 
-Note `.env.local` currently spells it `CLERK_JWKS_KEY`; the code reads `CLERK_JWKS_URL`. A 401 from every request usually means that name drifted again.
+Two traps in `saas/.env.local`, both already hit once:
+
+- It spells the JWKS variable `CLERK_JWKS_KEY`; the code reads `CLERK_JWKS_URL`. A 401 on every request usually means that name drifted again.
+- It contains a **second block of placeholder values** (`pk_test_...`) below the real ones. Next.js takes the last occurrence, so those placeholders win and `npm run build` dies with "The publishableKey passed to Clerk is invalid". They are commented out now; if the build fails that way again, look for a re-pasted block rather than a bad key.
+
+### The live deployment
+
+Account `190176595816`, region **us-east-2** (not the `us-east-1` the course examples use). Lambda function `consultation-app`, ECR repo of the same name, execution role `consultation-app-role-pchjrphk`, public Function URL:
+
+```
+https://55ncfzx5whditvl2364jsjk3gy0twvlw.lambda-url.us-east-2.on.aws/
+```
+
+A deploy is: `npm run build` → docker build → tag → push → `aws lambda update-function-code`. The image tag is always `:latest`, so a rollback means rebuilding from an older commit, not re-pointing a tag. `update-function-code` and `update-function-configuration` cannot overlap — `aws lambda wait function-updated` between them.
+
+`--environment` on `update-function-configuration` **replaces the whole variable map**, so always read the current one and merge rather than passing only the keys you are changing.
+
+The IAM user `AIEngineer` has `IAMFullAccess` but no DynamoDB rights by default; the table and the role policy have to be granted before `DYNAMODB_TABLE` will work.
 
 ### Conventions
 
