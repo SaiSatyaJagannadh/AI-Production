@@ -41,8 +41,13 @@ ENV AWS_LWA_INVOKE_MODE=response_stream
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the FastAPI server
-COPY api/server.py .
+# Copy the FastAPI server and its modules
+COPY api/server.py api/db.py api/dynamo.py api/mailer.py ./
+
+# Storage: with DYNAMODB_TABLE set (as it is on Lambda) the app uses DynamoDB
+# and this SQLite path is unused. Without it, SQLite at DB_PATH — fine locally,
+# but on Lambda /tmp is per-container and wiped on a cold start.
+ENV DB_PATH=/tmp/medinotes.db
 
 # Copy the Next.js static export from builder stage
 COPY --from=frontend-builder /app/out ./static
