@@ -32,9 +32,18 @@ A clinician pastes the shorthand they typed during a visit. One request later, t
 |---|---|
 | 📋 **Summary of visit** | A structured record entry — history, findings, assessment — in the order a chart expects |
 | ✅ **Next steps** | Follow-ups, referrals, labs and medication changes pulled out as an actionable checklist |
+| ⚠️ **Safety netting & red flags** | The symptoms that should trigger urgent review, and anything time-critical in the notes |
 | ✉️ **Patient email** | The same visit rewritten at a reading level patients actually use |
 
-Each section renders in its own card with its own **copy button**, so the chart entry goes to the chart and the email goes to the mail client — without dragging the other two along.
+Each section renders in its own card with its own **copy button**, so the chart entry goes to the chart and the email goes to the mail client — without dragging the others along. Then:
+
+| | |
+|---|---|
+| 🗂️ **History** | Every consultation is saved and searchable by patient name, with a draft/emailed status on each |
+| ✏️ **Edit before it counts** | The clinician edits the generated draft in place and saves it — the model writes a first pass, not the record |
+| 📤 **Send to the patient** | A composer prefilled from the patient section: review, edit, then send over SMTP. Never automatic |
+| 🧾 **Audit trail** | Generated / edited / emailed / deleted, with timestamps, per consultation |
+| 📊 **Dashboard** | Total consultations, last 7 days, how many were emailed |
 
 ```text
 55M, 3/7 productive cough, no fever. Ex-smoker, 20 pack years.
@@ -90,6 +99,8 @@ flowchart LR
 | Backend | FastAPI + Uvicorn | Async streaming responses in a handful of lines |
 | Model | OpenAI `gpt-5-nano` with `stream=True` | Fast and cheap enough for per-visit use |
 | Auth & billing | Clerk (JWT + `PricingTable`) | Sign-in, subscription gating and JWKS verification out of the box |
+| Storage | SQLite via stdlib `sqlite3` | Every row scoped to the signed-in clinician; zero extra infrastructure |
+| Email | stdlib `smtplib` | Any SMTP relay (SES, SendGrid, Postmark) with no provider SDK to pin |
 | Runtime | Docker → Amazon ECR → AWS Lambda (container image) | Scales to zero; you pay per consultation, not per hour |
 
 ---
@@ -139,6 +150,16 @@ aws lambda update-function-code --function-name consultation-app \
 | `CLERK_SECRET_KEY` · `CLERK_JWKS_URL` | Runtime — JWT verification |
 | `OPENAI_API_KEY` | Runtime — model calls |
 | `AWS_ACCOUNT_ID` · `DEFAULT_AWS_REGION` | ECR / Lambda commands |
+| `DB_PATH` | SQLite file — defaults to `/tmp/medinotes.db` (see the caveat below) |
+| `SMTP_HOST` · `SMTP_PORT` · `SMTP_USER` · `SMTP_PASSWORD` · `SMTP_FROM` · `CLINIC_NAME` | Patient email; unset means sending is disabled and the UI says so |
+
+> 💾 **SQLite on Lambda lives in `/tmp`**, which is per-container and wiped on a cold start — history is a session cache in production. Point `DB_PATH` at an EFS mount for durable storage, or swap `api/db.py` for DynamoDB.
+
+### Run the backend self-check
+
+```bash
+python3 api/test_db.py   # asserts user scoping, CRUD, email extraction and HTML escaping
+```
 
 ---
 
@@ -149,12 +170,15 @@ aws lambda update-function-code --function-name consultation-app \
 | Streaming arrived as one lump at the end | Lambda buffers responses by default | `ENV AWS_LWA_INVOKE_MODE=response_stream` + the Web Adapter extension |
 | Markdown collapsed into a single paragraph | SSE strips newlines from the payload | Re-encode each newline as `data:  \n`, decode with `remark-breaks` |
 | Image pushed fine, Lambda refused it | Built on arm64 with a provenance manifest | `--platform linux/amd64 --provenance=false` |
+| `/product` 404'd while `/product.html` worked | Static export writes `product.html`; Starlette serves directories | `trailingSlash: true` → `product/index.html` |
 
 ---
 
 ## ⚠️ Disclaimer
 
-A course/demonstration project — **not a medical device and not for clinical use.** Every output is a draft for a clinician to read, edit and sign off; nothing is sent to a patient automatically, and the app writes no notes to any database.
+A course/demonstration project — **not a medical device and not for clinical use.** Every output is a draft for a clinician to read, edit and sign off, and no email reaches a patient without an explicit click.
+
+It stores consultation notes and patient email addresses in SQLite, which makes it a demo, **not a HIPAA-compliant system**: there is no encryption at rest, no BAA with the model provider, and no retention policy. Don't put real patient data in it.
 
 <div align="center">
 

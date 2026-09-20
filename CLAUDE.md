@@ -58,7 +58,13 @@ uv run agentcore invoke '{"prompt": "..."}'
 
 `--platform linux/amd64 --provenance=false` is not optional on Apple Silicon — Lambda rejects both an arm64 image and the provenance manifest.
 
-There are no tests in this repo.
+Backend self-check (no framework, asserts only — run it after touching `db.py`, `mailer.py` or the prompt):
+
+```bash
+cd saas && python3 api/test_db.py
+```
+
+There are no frontend tests.
 
 ## saas architecture
 
@@ -66,14 +72,26 @@ There are no tests in this repo.
 
 `saas/api/` holds two different FastAPI apps for two deploy targets:
 
-- **`api/server.py`** — the live one. Serves `POST /api/consultation`, `GET /health`, and the static Next export mounted at `/`. This is what the Dockerfile copies and what Lambda runs.
+- **`api/server.py`** — the live one, with `api/db.py` (SQLite) and `api/mailer.py` (SMTP) beside it. Serves the whole API plus the static Next export mounted at `/`. This is what the Dockerfile copies and what Lambda runs.
 - **`api/index.py`** — the earlier Vercel Python Serverless Function, reachable at `/api` (Vercel maps `api/index.py` → `/api`, so the route inside is declared `@app.post("/api")`, not `/`).
 
 `pages/product.tsx` posts to **`/api/consultation`**, which only `server.py` serves. On the Vercel deployment that path 404s (`/api` answers, `/api/consultation` does not). So the container/Lambda path is the working one; either update `api/index.py` and Vercel routing or treat Vercel as the marketing-site-only deploy.
 
+Endpoints, all guarded by the Clerk JWT: `POST /api/consultation` (stream + persist), `GET /api/consultations` (list, `?q=` searches patient name), `GET|PATCH|DELETE /api/consultations/{id}`, `POST /api/consultations/{id}/email`, `GET /api/stats`, `GET /health`.
+
+### Persistence and email
+
+`api/db.py` is stdlib `sqlite3` at `DB_PATH` (default `/tmp/medinotes.db`). **Every query takes the Clerk user id from the verified token and filters on it** — that scoping is the only thing standing between two clinicians' records, so never add a query without it. Tables: `consultations` and `audit_log` (generate / edit / email_sent / delete).
+
+The Lambda caveat: `/tmp` is per-container and is wiped on a cold start, so history is effectively a session cache in production. Point `DB_PATH` at an EFS mount for durable storage, or swap the six functions in `db.py` for DynamoDB. The Dockerfile sets the default.
+
+`api/mailer.py` sends patient email over plain `smtplib` — any SMTP relay (SES, SendGrid, Postmark, Gmail app password) works via the `SMTP_*` variables. It is only ever reached from the email endpoint, which is only ever called by an explicit click in the UI; `is_configured()` drives a warning banner in the composer so a missing relay is visible before the clinician writes an email.
+
 ### Static export changes what's possible
 
 `next.config.ts` sets `output: 'export'`, so `npm run build` emits `out/` and there is **no SSR, no middleware, and no Next API routes** — adding a `pages/api/*` handler silently does nothing. Consequences worth remembering:
+
+- `trailingSlash: true` is load-bearing: it makes the export write `out/product/index.html` instead of `out/product.html`, which is the only shape Starlette's `StaticFiles(html=True)` can serve at `/product`. Remove it and the app page 404s in the container while still working under `next dev`.
 
 - `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` is baked in at build time, which is why the Dockerfile takes it as a `--build-arg` in the frontend stage. Changing Clerk keys means rebuilding the image, not just restarting the container.
 - `npm run dev` gives you the UI with no API behind it. To exercise the full app, build and run the container (or `npm run build` then `uvicorn api.server:app`).
@@ -82,7 +100,8 @@ There are no tests in this repo.
 
 1. `pages/product.tsx` gets a Clerk JWT via `useAuth().getToken()`.
 2. It POSTs to `/api/consultation` with `@microsoft/fetch-event-source` (not `fetch`, because SSE-over-POST needs it) and appends each `ev.data` chunk to a buffer rendered by `react-markdown`.
-3. `server.py` verifies the JWT with `fastapi-clerk-auth` against `CLERK_JWKS_URL`, then streams OpenAI chunks back as SSE.
+3. `server.py` verifies the JWT with `fastapi-clerk-auth` against `CLERK_JWKS_URL`, writes the row *before* calling the model, then streams OpenAI chunks back as SSE and saves the finished text in a `finally` block (so a dropped connection still persists the partial draft).
+4. Two named SSE events carry control data: `meta` (sent first) and `done` (sent last) both hold `{"id": <row id>}`. The client must skip any `ev.event` that is not the default `message`, or the JSON lands in the markdown buffer.
 
 **SSE newline quirk:** SSE strips newlines, so `event_stream()` re-encodes each newline as a `data:  \n` line (two trailing spaces) and the frontend restores breaks with `remark-breaks`. If rendered markdown suddenly collapses into one paragraph, that encode/decode pair is where to look.
 
@@ -90,7 +109,7 @@ There are no tests in this repo.
 
 **Route order in `server.py` matters:** the `app.mount("/", StaticFiles(...))` call must stay last, or it swallows `/api/consultation` and `/health`.
 
-The model prompt lives in `system_prompt` (duplicated in both backend files) and is contractual with the UI: it must produce exactly three `###` sections (summary / next steps / patient email), because `pages/product.tsx` splits the stream on those headings to render per-section copy buttons.
+The model prompt lives in `system_prompt` (duplicated in both backend files) and is contractual with the UI: four `###` sections — summary / next steps / safety netting and red flags / patient email. `lib/api.ts` splits on those headings for per-section copy buttons, highlights the red-flag card, and finds the section whose title contains "email" to prefill the composer (`mailer.patient_email_section` does the same server-side). Renaming that last heading silently empties the email draft.
 
 Auth and billing are both Clerk: `<ClerkProvider>` wraps the app in `pages/_app.tsx`; `<Protect plan="premium_subscription">` in `product.tsx` gates the app behind Clerk's `<PricingTable />`.
 
@@ -101,6 +120,8 @@ Everything matching `.env*` is gitignored. `saas/.env` is the one the shell comm
 - `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` — build-time, baked into the export
 - `CLERK_SECRET_KEY`, `CLERK_JWKS_URL`, `OPENAI_API_KEY` — runtime, backend
 - `DEFAULT_AWS_REGION`, `AWS_ACCOUNT_ID` — used by the ECR/Lambda commands
+- `DB_PATH` — SQLite file (default `/tmp/medinotes.db`)
+- `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM`, `CLINIC_NAME` — patient email; unset means the send endpoint returns 503 and the UI warns up front
 
 Note `.env.local` currently spells it `CLERK_JWKS_KEY`; the code reads `CLERK_JWKS_URL`. A 401 from every request usually means that name drifted again.
 
@@ -108,4 +129,6 @@ Note `.env.local` currently spells it `CLERK_JWKS_KEY`; the code reads `CLERK_JW
 
 - Pages Router (`pages/`), not App Router — week 2's material uses App Router, this app does not. Don't add an `app/` directory.
 - Tailwind v4 via `@import "tailwindcss"` in `styles/globals.css`; there is no `tailwind.config.js`. Theme colors are CSS custom properties on `:root` (with a `prefers-color-scheme: dark` block) exposed to Tailwind through `@theme inline` — so `bg-surface`, `text-muted`, `border-line`, `bg-accent` are project tokens, not stock Tailwind. Shared input styling is the `.field` class, which also restyles `react-datepicker` (it ships light-only CSS).
+- Frontend data access goes through `lib/api.ts` (typed fetch helpers that attach the JWT); `pages/product.tsx` holds only UI. Buttons use the `.btn-primary` / `.btn-ghost` classes in `globals.css`.
+- The app stores patient notes and email addresses. It is a course demo, not a HIPAA-compliant system: no encryption at rest, no BAA, no retention policy. Keep that caveat in the UI and README if you extend it.
 - `saas/AGENTS.md` is generated by `next dev` and re-added automatically; commit it with your work rather than fighting it. `saas/CLAUDE.md` just includes it.
