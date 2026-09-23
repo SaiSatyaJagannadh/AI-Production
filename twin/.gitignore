@@ -1,1 +1,12 @@
 .env*
+# Secrets and build output
+*.pem
+*.key
+*credentials*.json
+secrets.json
+__pycache__/
+.venv/
+venv/
+node_modules/
+.next/
+out/

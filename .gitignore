@@ -182,3 +182,32 @@ finale/Dockerfile
 finale/.dockerignore
 .vercel
 .env*
+
+# --- Secrets and credentials (repo-wide) -------------------------------------
+# .env* above already covers env files; these catch the other shapes that
+# routinely leak. Note: adding a rule here does NOT untrack a file that is
+# already committed — use `git rm --cached <file>` for that.
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+id_rsa
+id_rsa.*
+id_ed25519
+id_ed25519.*
+*credentials*.json
+*service-account*.json
+secrets.json
+secrets.yaml
+secrets.yml
+.netrc
+.npmrc
+.pypirc
+.aws/
+.ssh/
+*.tfvars
+*.tfstate
+*.tfstate.*
+.terraform/
