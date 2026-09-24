@@ -211,3 +211,5 @@ secrets.yml
 *.tfstate
 *.tfstate.*
 .terraform/
+lambda-deployment.zip
+lambda-package/
