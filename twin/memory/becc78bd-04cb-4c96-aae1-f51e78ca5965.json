@@ -1,0 +1,32 @@
+[
+  {
+    "role": "user",
+    "content": "whats my name ",
+    "timestamp": "2026-09-23T22:03:21.532326"
+  },
+  {
+    "role": "assistant",
+    "content": "I don't have your name. However, I'm here to represent myself as Sai Satya Jagannadh. How can I assist you today?",
+    "timestamp": "2026-09-23T22:03:21.532340"
+  },
+  {
+    "role": "user",
+    "content": "mamke it as DJ",
+    "timestamp": "2026-09-23T22:03:45.950267"
+  },
+  {
+    "role": "assistant",
+    "content": "Got it! You can call me DJ. How can I assist you today?",
+    "timestamp": "2026-09-23T22:03:45.950276"
+  },
+  {
+    "role": "user",
+    "content": "which roles are interested by me ",
+    "timestamp": "2026-09-23T22:04:01.161584"
+  },
+  {
+    "role": "assistant",
+    "content": "I'm currently focused on positions in data engineering, AI/ML engineering, and AI solutions architecture. If there's a specific role or area you're curious about, feel free to ask!",
+    "timestamp": "2026-09-23T22:04:01.161624"
+  }
+]

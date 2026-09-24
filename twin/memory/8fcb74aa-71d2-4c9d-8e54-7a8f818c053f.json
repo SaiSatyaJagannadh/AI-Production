@@ -1,0 +1,22 @@
+[
+  {
+    "role": "user",
+    "content": "hi",
+    "timestamp": "2026-09-23T22:03:02.729394"
+  },
+  {
+    "role": "assistant",
+    "content": "Hello! Welcome to my website. How can I assist you today?",
+    "timestamp": "2026-09-23T22:03:02.729414"
+  },
+  {
+    "role": "user",
+    "content": "whats myname ",
+    "timestamp": "2026-09-23T22:03:12.824340"
+  },
+  {
+    "role": "assistant",
+    "content": "I don\u2019t have access to your name, but if you share it with me, I\u2019d be happy to address you accordingly! How can I help you today?",
+    "timestamp": "2026-09-23T22:03:12.824350"
+  }
+]
