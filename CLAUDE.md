@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this repo is
 
-Ed Donner's "AI in Production" course repo. Most of it is **instructional markdown** (`week1/`–`week4/`, `guides/*.ipynb`, `community_contributions/`) that walks a student through building and deploying apps. Three directories contain runnable code:
+Ed Donner's "AI in Production" course repo. Most of it is **instructional markdown** (`week1/`–`week4/`, `guides/*.ipynb`, `community_contributions/`) that walks a student through building and deploying apps. Four directories contain runnable code:
 
 | Dir | Stack | Deploy target |
 |---|---|---|
