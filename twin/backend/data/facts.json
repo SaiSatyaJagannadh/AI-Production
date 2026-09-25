@@ -1,21 +1,24 @@
 {
-    "full_name": "Your Full Name",
-    "name": "Your Nickname",
-    "current_role": "Your Current Role",
-    "location": "Your Location",
-    "email": "your.email@example.com",
-    "linkedin": "linkedin.com/in/yourprofile",
-    "specialties": [
-      "Your specialty 1",
-      "Your specialty 2",
-      "Your specialty 3"
-    ],
-    "years_experience": 10,
-    "education": [
-      {
-        "degree": "Your Degree",
-        "institution": "Your University",
-        "year": "2020"
-      }
-    ]
-  }
+  "full_name": "Sai Satya Jagannadh Doddipatla",
+  "name": "DJ",
+  "current_role": "Tech Engineer @ UBS — AI & Data Engineering",
+  "location": "United States",
+  "email": "saijagannadh99@gmail.com",
+  "linkedin": "linkedin.com/in/saijagannadh",
+  "github": "github.com/SaiSatyaJagannadh",
+  "portfolio": "saisatyajagannadh.github.io/PersonalPortfolio/",
+  "specialties": [
+    "AI & data engineering — LLMs, RAG, production data pipelines",
+    "Azure, Databricks, PySpark, MLflow",
+    "Site reliability engineering and cloud deployment"
+  ],
+  "years_experience": 4,
+  "education": [
+    {
+      "degree": "MS, Computer Science",
+      "institution": "California State University, Fullerton",
+      "year": ""
+    }
+  ],
+  "open_to": "SRE and AI/data engineering roles, with an interest in finance"
+}

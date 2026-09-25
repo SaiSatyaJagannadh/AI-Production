@@ -10,3 +10,7 @@ venv/
 node_modules/
 .next/
 out/
+
+# Conversation transcripts written by the backend's local memory store —
+# real chat content, must never be committed.
+memory/
