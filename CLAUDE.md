@@ -10,6 +10,7 @@ Ed Donner's "AI in Production" course repo. Most of it is **instructional markdo
 |---|---|---|
 | `instant/` | Single-file FastAPI returning HTML | Vercel (`vercel.json` routes all traffic to `instant.py`) |
 | `saas/` | Next.js (Pages Router) static export + FastAPI | Vercel **and** Docker → ECR → AWS Lambda |
+| `twin/` | Next.js **App Router** + FastAPI chat backend (week 2) | Lambda via Mangum (`deploy.py`) |
 | `finale/` | Strands agents on AWS Bedrock AgentCore, `uv` project | AWS (`agentcore launch`) |
 
 `week3/` and `week4/` are pointers to other repos (`ed-donner/cyber`, `alex`) — no code for them here.
@@ -17,6 +18,10 @@ Ed Donner's "AI in Production" course repo. Most of it is **instructional markdo
 ## Commands
 
 ```bash
+# twin/ — backend then frontend, in two terminals
+cd twin/backend && uv run uvicorn server:app --reload --port 8000
+cd twin/frontend && npm run dev            # needs NEXT_PUBLIC_API_URL in .env.local
+
 # saas/ frontend
 cd saas
 npm install
@@ -65,6 +70,21 @@ cd saas && python3 api/test_db.py
 ```
 
 There are no frontend tests.
+
+## twin architecture (week 2)
+
+A personal "digital twin" chat: `twin/frontend` (App Router) talks to `twin/backend` (FastAPI) over plain JSON — no streaming, unlike saas.
+
+**The persona is assembled at import, not hardcoded.** `resources.py` reads `backend/data/` (LinkedIn PDF via pypdf, `summary.txt`, `style.txt`, `facts.json`); `context.py` interpolates those into one large system prompt. Editing the twin's personality means editing those data files, not the Python. Two traps live here, both already fixed once:
+
+- Paths resolve from `Path(__file__).parent`, never the working directory — the server runs from `backend/` locally and `/var/task` on Lambda.
+- The PDF lookup is case-insensitive because the file is committed as `Linkedin.pdf` while the code asked for `linkedin.pdf`. On macOS that resolves; on Lambda's Linux filesystem it silently degrades to "LinkedIn profile not available", and the twin gets vague without any error.
+
+**Memory** is per-session JSON, keyed by a `session_id` the backend mints on the first message: local files under `MEMORY_DIR` (default `twin/memory/`, gitignored — real transcripts) or S3 objects when `USE_S3=true` and `S3_BUCKET` is set. Only the **last 10 messages** are replayed into the prompt, so long conversations lose their early context by design.
+
+The frontend keeps that `session_id` in `localStorage` and re-fetches `GET /conversation/{id}` on load, which is why a refresh keeps the thread. `components/api.ts` holds the fetch layer and reads `NEXT_PUBLIC_API_URL` — note it is in `components/`, not `lib/`, because the root `.gitignore`'s Python `lib/` rule would swallow it (`saas/lib/` needed an explicit negation).
+
+`lambda_handler.py` wraps the app in Mangum for Lambda; `deploy.py` builds the package. Unlike saas, this backend does **not** serve the frontend — they deploy separately, so CORS matters (`CORS_ORIGINS`, comma-separated).
 
 ## saas architecture
 
@@ -140,6 +160,7 @@ Everything matching `.env*` is gitignored. `saas/.env` is the one the shell comm
 - `DEFAULT_AWS_REGION`, `AWS_ACCOUNT_ID` — used by the ECR/Lambda commands
 - `DYNAMODB_TABLE` — set it and the app uses DynamoDB; unset and it uses SQLite
 - `DB_PATH` — SQLite file when DynamoDB is off (default `/tmp/medinotes.db`)
+- twin only: `NEXT_PUBLIC_API_URL` (frontend, build-time), `CORS_ORIGINS`, `MEMORY_DIR`, `USE_S3`, `S3_BUCKET`
 - `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM`, `CLINIC_NAME` — patient email; incomplete means the send endpoint returns 503 and the composer falls back to the clinician's own mail client
 
 Two traps in `saas/.env.local`, both already hit once:
@@ -163,7 +184,9 @@ The IAM user `AIEngineer` has `IAMFullAccess` but no DynamoDB rights by default;
 
 ### Conventions
 
-- Pages Router (`pages/`), not App Router — week 2's material uses App Router, this app does not. Don't add an `app/` directory.
+- `saas/` is Pages Router (`pages/`); `twin/` is App Router (`app/`). Don't mix them — no `app/` directory in saas, no `pages/` in twin.
+- `twin/frontend` also contains a stray `pyproject.toml` and `uv.lock` (a uv project initialised in the wrong directory). Harmless, but it is not a Python project.
+- lucide-react 1.x **removed brand icons** — `Github` and `Linkedin` no longer exist and fail the build as "Export doesn't exist in target module". Use generic icons.
 - Tailwind v4 via `@import "tailwindcss"` in `styles/globals.css`; there is no `tailwind.config.js`. Theme colors are CSS custom properties on `:root` (with a `prefers-color-scheme: dark` block) exposed to Tailwind through `@theme inline` — so `bg-surface`, `text-muted`, `border-line`, `bg-accent` are project tokens, not stock Tailwind. Shared input styling is the `.field` class, which also restyles `react-datepicker` (it ships light-only CSS).
 - Frontend data access goes through `lib/api.ts` (typed fetch helpers that attach the JWT); `pages/product.tsx` holds only UI. Buttons use the `.btn-primary` / `.btn-ghost` classes in `globals.css`.
 - The app stores patient notes and email addresses. It is a course demo, not a HIPAA-compliant system: no encryption at rest, no BAA, no retention policy. Keep that caveat in the UI and README if you extend it.
