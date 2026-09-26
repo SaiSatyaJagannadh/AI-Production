@@ -203,7 +203,7 @@ export default function Twin({ name = 'DJ' }: { name?: string }) {
     <div className="flex h-full flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-sm">
       <header className="flex items-center justify-between gap-3 border-b border-line px-5 py-3.5">
         <div className="flex items-center gap-3">
-          <span className="relative flex h-9 w-9 items-center justify-center rounded-full bg-accent text-white">
+          <span className="relative flex h-9 w-9 items-center justify-center rounded-full bg-accent text-on-accent">
             <Bot className="h-4.5 w-4.5" />
             <span
               className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-surface ${
@@ -286,7 +286,7 @@ export default function Twin({ name = 'DJ' }: { name?: string }) {
               >
                 <span
                   className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${
-                    mine ? 'bg-surface-2 text-muted' : 'bg-accent text-white'
+                    mine ? 'bg-surface-2 text-muted' : 'bg-accent text-on-accent'
                   }`}
                 >
                   {mine ? <User className="h-3.5 w-3.5" /> : <Bot className="h-3.5 w-3.5" />}
@@ -296,7 +296,7 @@ export default function Twin({ name = 'DJ' }: { name?: string }) {
                   <div
                     className={`whitespace-pre-wrap rounded-2xl px-4 py-2.5 text-[15px] leading-relaxed ${
                       mine
-                        ? 'rounded-tr-sm bg-accent text-white'
+                        ? 'rounded-tr-sm bg-accent text-on-accent'
                         : 'rounded-tl-sm border border-line bg-surface-2'
                     }`}
                   >
@@ -314,7 +314,7 @@ export default function Twin({ name = 'DJ' }: { name?: string }) {
 
         {isLoading && (
           <div className="flex gap-3">
-            <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-accent text-white">
+            <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-accent text-on-accent">
               <Bot className="h-3.5 w-3.5" />
             </span>
             <div className="flex items-center gap-1.5 rounded-2xl rounded-tl-sm border border-line bg-surface-2 px-4 py-3.5">
@@ -377,7 +377,7 @@ export default function Twin({ name = 'DJ' }: { name?: string }) {
             type="submit"
             disabled={!input.trim() || isLoading || offline}
             aria-label="Send message"
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-accent text-white transition-colors hover:bg-accent-strong disabled:cursor-not-allowed disabled:opacity-40"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-accent text-on-accent transition-colors hover:bg-accent-strong disabled:cursor-not-allowed disabled:opacity-40"
           >
             <ArrowUp className="h-4 w-4" />
           </button>
