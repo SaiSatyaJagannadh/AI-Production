@@ -10,17 +10,20 @@ Ed Donner's "AI in Production" course repo. Most of it is **instructional markdo
 |---|---|---|
 | `instant/` | Single-file FastAPI returning HTML | Vercel (`vercel.json` routes all traffic to `instant.py`) |
 | `saas/` | Next.js (Pages Router) static export + FastAPI | Vercel **and** Docker → ECR → AWS Lambda |
-| `twin/` | Next.js **App Router** + FastAPI chat backend (week 2) | Lambda via Mangum (`deploy.py`) |
+| `twin/` | Next.js **App Router** + FastAPI chat backend (week 2) | **local only so far** — see below |
 | `finale/` | Strands agents on AWS Bedrock AgentCore, `uv` project | AWS (`agentcore launch`) |
 
 `week3/` and `week4/` are pointers to other repos (`ed-donner/cyber`, `alex`) — no code for them here.
+
+Only **one** thing is actually deployed: the `consultation-app` Lambda in us-east-2 (that is `saas/`). `twin/` has Lambda scaffolding but no function exists yet, and `instant/` and `finale/` are exercises. Check before assuming a change reaches production.
 
 ## Commands
 
 ```bash
 # twin/ — backend then frontend, in two terminals
-cd twin/backend && uv run uvicorn server:app --reload --port 8000
-cd twin/frontend && npm run dev            # needs NEXT_PUBLIC_API_URL in .env.local
+cd twin/backend && uv sync && uv run uvicorn server:app --reload --port 8000
+cd twin/frontend && npm install && npm run dev   # needs NEXT_PUBLIC_API_URL in .env.local
+# twin has no tests; verify by chatting, then reloading the page (history should survive)
 
 # saas/ frontend
 cd saas
@@ -71,6 +74,12 @@ cd saas && python3 api/test_db.py
 
 There are no frontend tests.
 
+## Verifying a change actually works
+
+The recurring failure mode here is *"fine in `next dev`, broken in the container"*, and it has bitten three separate ways: the `/product` 404 (static export writes `.html`, the mount serves directories), the LinkedIn PDF vanishing (case-sensitive filesystem), and a Clerk key baked in at build time. `next dev` proves almost nothing about production for these apps.
+
+For a saas change, the real check is: `npm run build` → `docker build` → `docker run` → hit the container. For twin, run the backend from `twin/backend/` and confirm the persona loaded (an empty or generic reply usually means `resources.py` found nothing).
+
 ## twin architecture (week 2)
 
 A personal "digital twin" chat: `twin/frontend` (App Router) talks to `twin/backend` (FastAPI) over plain JSON — no streaming, unlike saas.
@@ -84,7 +93,9 @@ A personal "digital twin" chat: `twin/frontend` (App Router) talks to `twin/back
 
 The frontend keeps that `session_id` in `localStorage` and re-fetches `GET /conversation/{id}` on load, which is why a refresh keeps the thread. `components/api.ts` holds the fetch layer and reads `NEXT_PUBLIC_API_URL` — note it is in `components/`, not `lib/`, because the root `.gitignore`'s Python `lib/` rule would swallow it (`saas/lib/` needed an explicit negation).
 
-`lambda_handler.py` wraps the app in Mangum for Lambda; `deploy.py` builds the package. Unlike saas, this backend does **not** serve the frontend — they deploy separately, so CORS matters (`CORS_ORIGINS`, comma-separated).
+`lambda_handler.py` wraps the app in Mangum, and `uv run deploy.py` builds `lambda-deployment.zip` by pip-installing into the official Lambda image (so the wheels are manylinux x86_64, not macOS arm64). **It stops at the zip** — there is no upload step and no Lambda function for the twin yet, so deploying means creating the function and uploading by hand. The zip lands around 29 MB against Lambda's 50 MB limit for a direct upload, so it goes via S3 or a container image if it grows.
+
+Unlike saas, this backend does **not** serve the frontend — they deploy separately, so CORS matters (`CORS_ORIGINS`, comma-separated).
 
 ## saas architecture
 
@@ -93,7 +104,7 @@ The frontend keeps that `session_id` in `localStorage` and re-fetches `GET /conv
 `saas/api/` holds two different FastAPI apps for two deploy targets:
 
 - **`api/server.py`** — the live one, with `api/db.py`, `api/dynamo.py` and `api/mailer.py` beside it. Serves the whole API plus the static Next export mounted at `/`. The Dockerfile copies those four files by name, so **a new module is invisible to the container until you add it to that COPY line**.
-- **`api/index.py`** — the earlier Vercel Python Serverless Function, reachable at `/api` (Vercel maps `api/index.py` → `/api`, so the route inside is declared `@app.post("/api")`, not `/`).
+- **`api/index.py`** — the earlier Vercel Python Serverless Function, reachable at `/api` (Vercel maps `api/index.py` → `/api`, so the route inside is declared `@app.post("/api")`, not `/`). It has drifted a long way: three prompt sections instead of four (no red flags), and no knowledge of persistence, email or the audit trail. Treat it as dead code unless you deliberately revive it.
 
 `pages/product.tsx` posts to **`/api/consultation`**, which only `server.py` serves. On the Vercel deployment that path 404s (`/api` answers, `/api/consultation` does not). So the container/Lambda path is the working one; either update `api/index.py` and Vercel routing or treat Vercel as the marketing-site-only deploy.
 
