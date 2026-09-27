@@ -54,9 +54,9 @@ export default function Twin({ name = 'DJ' }: { name?: string }) {
   const [restoring, setRestoring] = useState(true);
 
   const threadRef = useRef<HTMLDivElement>(null);
-  const endRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const pinnedToBottom = useRef(true);
+  const hasScrolledOnce = useRef(false);
 
   // Restore the previous conversation, and find out whether the API is up at all.
   useEffect(() => {
@@ -110,9 +110,17 @@ export default function Twin({ name = 'DJ' }: { name?: string }) {
   // Only auto-scroll when the reader is already at the bottom, so scrolling back
   // through the conversation is not yanked away by a new message.
   useEffect(() => {
-    if (pinnedToBottom.current) {
-      endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
-    }
+    // Scroll the transcript itself rather than calling scrollIntoView, which
+    // also scrolls the page and left new messages hidden behind the composer.
+    const thread = threadRef.current;
+    if (!thread || !pinnedToBottom.current) return;
+
+    // A restored conversation must land at the newest message immediately; a
+    // smooth animation over that distance gets cancelled and strands the
+    // reader at the top.
+    const behavior: ScrollBehavior = hasScrolledOnce.current ? 'smooth' : 'auto';
+    thread.scrollTo({ top: thread.scrollHeight, behavior });
+    if (messages.length) hasScrolledOnce.current = true;
   }, [messages, isLoading]);
 
   function onThreadScroll() {
@@ -234,7 +242,8 @@ export default function Twin({ name = 'DJ' }: { name?: string }) {
         <p className="flex items-start gap-2 border-b border-line bg-amber-50 px-5 py-2.5 text-sm text-amber-800 dark:bg-amber-950/30 dark:text-amber-300">
           <WifiOff className="mt-0.5 h-4 w-4 shrink-0" />
           <span>
-            The twin&rsquo;s API isn&rsquo;t responding. Start it with{' '}
+            The twin&rsquo;s API didn&rsquo;t answer a health check — it may just be a cold
+            start. Sending still works; if it fails, start the backend with{' '}
             <code className="rounded bg-black/10 px-1 py-0.5 text-xs dark:bg-white/10">
               uv run uvicorn server:app --reload
             </code>{' '}
@@ -268,8 +277,7 @@ export default function Twin({ name = 'DJ' }: { name?: string }) {
                   key={starter}
                   type="button"
                   onClick={() => send(starter)}
-                  disabled={offline}
-                  className="rounded-xl border border-line bg-surface-2 px-3.5 py-2.5 text-sm transition-colors hover:border-accent hover:text-accent disabled:cursor-not-allowed disabled:opacity-50"
+                  className="rounded-xl border border-line bg-surface-2 px-3.5 py-2.5 text-sm transition-colors hover:border-accent hover:text-accent"
                 >
                   {starter}
                 </button>
@@ -340,7 +348,6 @@ export default function Twin({ name = 'DJ' }: { name?: string }) {
           </div>
         )}
 
-        <div ref={endRef} />
       </div>
 
       <div className="border-t border-line p-3">
@@ -369,13 +376,13 @@ export default function Twin({ name = 'DJ' }: { name?: string }) {
                 send(input);
               }
             }}
-            placeholder={offline ? 'Start the backend to chat…' : `Message ${name}'s twin…`}
-            disabled={isLoading || offline}
+            placeholder={`Message ${name}'s twin…`}
+            disabled={isLoading}
             className="max-h-40 flex-1 resize-none bg-transparent px-2 py-1.5 text-[15px] leading-relaxed outline-none placeholder:text-muted disabled:cursor-not-allowed"
           />
           <button
             type="submit"
-            disabled={!input.trim() || isLoading || offline}
+            disabled={!input.trim() || isLoading}
             aria-label="Send message"
             className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-accent text-on-accent transition-colors hover:bg-accent-strong disabled:cursor-not-allowed disabled:opacity-40"
           >

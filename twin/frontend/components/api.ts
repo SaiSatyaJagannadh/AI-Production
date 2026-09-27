@@ -9,9 +9,20 @@
  * has a Python `lib/` rule that would swallow the file.
  */
 
-export const API_URL = (
-  process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
-).replace(/\/$/, '');
+/**
+ * Set NEXT_PUBLIC_API_URL to the API Gateway *base* (the "Invoke URL"), e.g.
+ *   https://abc123xyz.execute-api.us-east-1.amazonaws.com
+ * The /chat and /conversation paths are appended below. Pasting a URL that
+ * already ends in /chat is tolerated, because that is the form week2/day2.md
+ * shows and it would otherwise silently request /chat/chat.
+ *
+ * This is inlined at BUILD time, not read at runtime — after changing it you
+ * must `npm run build` again and re-upload, or the old URL stays baked in.
+ */
+export const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000')
+  .trim()
+  .replace(/\/+$/, '')
+  .replace(/\/chat$/, '');
 
 export type Role = 'user' | 'assistant';
 
