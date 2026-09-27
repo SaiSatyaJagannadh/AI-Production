@@ -2,13 +2,33 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowUp, Bot, Check, Copy, RefreshCw, User, WifiOff } from 'lucide-react';
-import {
-  checkHealth,
-  fetchHistory,
-  formatTime,
-  sendChat,
-  type ChatMessage,
-} from './api';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// EDIT THIS when you deploy — paste your API Gateway Invoke URL
+// (week2/day2.md, Part 7 Step 1). Keep the /chat on the end.
+// Local development:  http://localhost:8000/chat
+// ─────────────────────────────────────────────────────────────────────────────
+const CHAT_URL = 'http://localhost:8000/chat';
+
+// The other two endpoints live on the same host, derived so there is only ever
+// one URL to change above.
+const API_BASE = CHAT_URL.replace(/\/chat$/, '');
+
+type Role = 'user' | 'assistant';
+
+type ChatMessage = {
+  id: string;
+  role: Role;
+  content: string;
+  timestamp: string;
+};
+
+function formatTime(iso: string): string {
+  const date = new Date(iso);
+  return Number.isNaN(date.getTime())
+    ? ''
+    : date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+}
 
 const SESSION_KEY = 'twin.session-id';
 
@@ -71,7 +91,8 @@ export default function Twin({ name = 'DJ' }: { name?: string }) {
       }
 
       try {
-        await checkHealth();
+        const health = await fetch(`${API_BASE}/health`);
+        if (!health.ok) throw new Error(`health ${health.status}`);
         if (!cancelled) setOffline(false);
       } catch {
         if (!cancelled) {
@@ -84,7 +105,11 @@ export default function Twin({ name = 'DJ' }: { name?: string }) {
       if (saved) {
         setSessionId(saved);
         try {
-          const history = await fetchHistory(saved);
+          const stored = await fetch(
+            `${API_BASE}/conversation/${encodeURIComponent(saved)}`,
+          );
+          if (!stored.ok) throw new Error(`history ${stored.status}`);
+          const history: { messages: ChatMessage[] } = await stored.json();
           if (!cancelled) {
             setMessages(
               history.messages.map((message, index) => ({
@@ -157,7 +182,19 @@ export default function Twin({ name = 'DJ' }: { name?: string }) {
       setIsLoading(true);
 
       try {
-        const result = await sendChat(trimmed, sessionId);
+        const response = await fetch(CHAT_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            message: trimmed,
+            session_id: sessionId || undefined,
+          }),
+        });
+        if (!response.ok) {
+          const detail = await response.json().catch(() => null);
+          throw new Error(detail?.detail || `The twin returned ${response.status}.`);
+        }
+        const result: { response: string; session_id: string } = await response.json();
         setOffline(false);
 
         if (!sessionId) {
