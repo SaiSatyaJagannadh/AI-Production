@@ -182,7 +182,7 @@ export default function Twin({ name = 'DJ' }: { name?: string }) {
       setIsLoading(true);
 
       try {
-        const response = await fetch(CHAT_URL, {
+        const response = await fetch('https://m8v3aymn92.execute-api.us-east-2.amazonaws.com/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
