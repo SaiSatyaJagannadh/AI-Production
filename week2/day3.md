@@ -536,6 +536,7 @@ Wait for the update to complete. You should see output with `"LastUpdateStatus":
 
 Test your API directly in the browser: https://YOUR-API-ID.execute-api.us-east-1.amazonaws.com/health
 
+https://m8v3aymn92.execute-api.us-east-2.amazonaws.com/health
 You should see the Bedrock model in the response.
 
 ### Step 2: Test via CloudFront
