@@ -3,16 +3,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowUp, Bot, Check, Copy, RefreshCw, User, WifiOff } from 'lucide-react';
 
-// ─────────────────────────────────────────────────────────────────────────────
-// EDIT THIS when you deploy — paste your API Gateway Invoke URL
-// (week2/day2.md, Part 7 Step 1). Keep the /chat on the end.
-// Local development:  http://localhost:8000/chat
-// ─────────────────────────────────────────────────────────────────────────────
-const CHAT_URL = 'http://localhost:8000/chat';
-
-// The other two endpoints live on the same host, derived so there is only ever
-// one URL to change above.
-const API_BASE = CHAT_URL.replace(/\/chat$/, '');
+// Backend URL — set NEXT_PUBLIC_API_URL in frontend/.env.local before building:
+//
+//   NEXT_PUBLIC_API_URL=https://YOUR-API-ID.execute-api.us-east-2.amazonaws.com
+//
+// NEXT_PUBLIC_* is inlined at BUILD time, so after changing it run
+// `npm run build` again and re-upload; restarting the server is not enough.
+// Leave it unset and everything falls back to the local backend.
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 type Role = 'user' | 'assistant';
 
@@ -182,14 +180,17 @@ export default function Twin({ name = 'DJ' }: { name?: string }) {
       setIsLoading(true);
 
       try {
-        const response = await fetch('https://m8v3aymn92.execute-api.us-east-2.amazonaws.com/chat', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            message: trimmed,
-            session_id: sessionId || undefined,
-          }),
-        });
+        const response = await fetch(
+          `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/chat`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              message: trimmed,
+              session_id: sessionId || undefined,
+            }),
+          },
+        );
         if (!response.ok) {
           const detail = await response.json().catch(() => null);
           throw new Error(detail?.detail || `The twin returned ${response.status}.`);

@@ -714,7 +714,7 @@ Update `frontend/components/twin.tsx` - find the fetch call (around line 43) and
 const response = await fetch('http://localhost:8000/chat', {
 
 // Replace with:
-const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/chat`, {
+const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/chat', {
 ```
 
 This change allows the frontend to:
