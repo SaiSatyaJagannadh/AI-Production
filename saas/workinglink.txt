@@ -1,1 +1,6 @@
+
+--aws cdn cloudfront deploy
 https://55ncfzx5whditvl2364jsjk3gy0twvlw.lambda-url.us-east-2.on.aws/
+
+--vercel one 
+https://saas-dr0hd6t1h-sai-satya-jaganandh-doddipatlas-projects.vercel.app/
