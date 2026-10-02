@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowUp, Bot, Check, Copy, RefreshCw, User, WifiOff } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 // Backend URL — set NEXT_PUBLIC_API_URL in frontend/.env.local before building:
 //
@@ -340,13 +342,17 @@ export default function Twin({ name = 'DJ' }: { name?: string }) {
 
                 <div className={`flex max-w-[78%] flex-col gap-1 ${mine ? 'items-end' : ''}`}>
                   <div
-                    className={`whitespace-pre-wrap rounded-2xl px-4 py-2.5 text-[15px] leading-relaxed ${
+                    className={`rounded-2xl px-4 py-2.5 text-[15px] leading-relaxed ${
                       mine
-                        ? 'rounded-tr-sm bg-accent text-on-accent'
-                        : 'rounded-tl-sm border border-line bg-surface-2'
+                        ? 'whitespace-pre-wrap rounded-tr-sm bg-accent text-on-accent'
+                        : 'reply rounded-tl-sm border border-line bg-surface-2'
                     }`}
                   >
-                    {message.content}
+                    {mine ? (
+                      message.content
+                    ) : (
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{message.content}</ReactMarkdown>
+                    )}
                   </div>
                   <div className="flex items-center gap-1 px-1">
                     <span className="text-[11px] text-muted">{formatTime(message.timestamp)}</span>
