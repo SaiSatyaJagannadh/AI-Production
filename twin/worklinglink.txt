@@ -1,1 +1,13 @@
+Manual deployment
+
 https://d1ozrewa9otrmw.cloudfront.net
+
+terraform deployment 
+
+CloudFront  │ https://do2s1pa4farox.cloudfront.net                         │
+├─────────────┼──────────────────────────────────────────────────────────────┤
+│ API Gateway │ https://pm9syt8bp2.execute-api.us-east-2.amazonaws.com       │
+├─────────────┼──────────────────────────────────────────────────────────────┤
+│ Lambda      │ twin-dev-api                                                 │
+├─────────────┼──────────────────────────────────────────────────────────────┤
+│ Buckets     │ twin-dev-frontend-190176595816, twin-dev-memory-190176595816 │
