@@ -10,20 +10,34 @@ Ed Donner's "AI in Production" course repo. Most of it is **instructional markdo
 |---|---|---|
 | `instant/` | Single-file FastAPI returning HTML | Vercel (`vercel.json` routes all traffic to `instant.py`) |
 | `saas/` | Next.js (Pages Router) static export + FastAPI | Vercel **and** Docker → ECR → AWS Lambda |
-| `twin/` | Next.js **App Router** + FastAPI chat backend (week 2) | **local only so far** — see below |
+| `twin/` | Next.js **App Router** + FastAPI chat backend (week 2) | Terraform → Lambda + API Gateway + S3 + CloudFront |
 | `finale/` | Strands agents on AWS Bedrock AgentCore, `uv` project | AWS (`agentcore launch`) |
 
 `week3/` and `week4/` are pointers to other repos (`ed-donner/cyber`, `alex`) — no code for them here.
 
-Only **one** thing is actually deployed: the `consultation-app` Lambda in us-east-2 (that is `saas/`). `twin/` has Lambda scaffolding but no function exists yet, and `instant/` and `finale/` are exercises. Check before assuming a change reaches production.
+**Three Lambdas are live in us-east-2, and only one of them is managed by Terraform:**
+
+| Function | What | Managed by |
+|---|---|---|
+| `consultation-app` | the `saas/` app, container image, Function URL | hand-run docker/aws CLI |
+| `twin-api` | an earlier hand-built twin deploy — CloudFront `d1ozrewa9otrmw` | nothing; hand-made |
+| `twin-dev-api` | `twin/` via `scripts/deploy.sh dev` — CloudFront `do2s1pa4farox` | Terraform, `dev` workspace |
+
+`twin/scripts/destroy.sh dev` only tears down the Terraform one. The hand-made `twin-api` stack has to be deleted by hand, and it bills until you do. `instant/` and `finale/` are exercises. Check which stack you are touching before assuming a change reaches a given URL.
 
 ## Commands
 
 ```bash
 # twin/ — backend then frontend, in two terminals
 cd twin/backend && uv sync && uv run uvicorn server:app --reload --port 8000
-cd twin/frontend && npm install && npm run dev   # needs NEXT_PUBLIC_API_URL in .env.local
+cd twin/frontend && npm install && npm run dev   # no .env.local = talks to localhost:8000
 # twin has no tests; verify by chatting, then reloading the page (history should survive)
+
+# twin/ — full deploy (lambda zip + terraform apply + frontend build + s3 sync)
+cd twin && ./scripts/deploy.sh dev        # workspace name: dev | test | prod
+cd twin && ./scripts/destroy.sh dev       # empties the buckets, then destroys
+# after any s3 sync, CloudFront still serves the old bundle until you invalidate:
+aws cloudfront create-invalidation --distribution-id <id> --paths "/*"
 
 # saas/ frontend
 cd saas
@@ -74,6 +88,12 @@ cd saas && python3 api/test_db.py
 
 There are no frontend tests.
 
+## Where AWS identity comes from
+
+Nothing in this repo holds AWS credentials. `twin/terraform/versions.tf` has a bare `provider "aws" {}`, so the provider falls back to the CLI chain: env vars → `~/.aws/credentials` → SSO → instance role. `~/.aws/config` supplies the region (`us-east-2`). The account id is never stored either — `main.tf:2` calls `data "aws_caller_identity" "current"`, and the result is interpolated into globally-unique bucket names (`twin-dev-frontend-<account id>`).
+
+Terraform state is local: `twin/terraform/terraform.tfstate.d/<workspace>/`. It is gitignored, so **whoever holds that directory is the only one who can cleanly destroy the stack** — lose it and the resources have to be deleted by hand.
+
 ## Verifying a change actually works
 
 The recurring failure mode here is *"fine in `next dev`, broken in the container"*, and it has bitten three separate ways: the `/product` 404 (static export writes `.html`, the mount serves directories), the LinkedIn PDF vanishing (case-sensitive filesystem), and a Clerk key baked in at build time. `next dev` proves almost nothing about production for these apps.
@@ -91,11 +111,16 @@ A personal "digital twin" chat: `twin/frontend` (App Router) talks to `twin/back
 
 **Memory** is per-session JSON, keyed by a `session_id` the backend mints on the first message: local files under `MEMORY_DIR` (default `twin/memory/`, gitignored — real transcripts) or S3 objects when `USE_S3=true` and `S3_BUCKET` is set. Only the **last 10 messages** are replayed into the prompt, so long conversations lose their early context by design.
 
-The frontend keeps that `session_id` in `localStorage` and re-fetches `GET /conversation/{id}` on load, which is why a refresh keeps the thread. `components/api.ts` holds the fetch layer and reads `NEXT_PUBLIC_API_URL` — note it is in `components/`, not `lib/`, because the root `.gitignore`'s Python `lib/` rule would swallow it (`saas/lib/` needed an explicit negation).
+The frontend keeps that `session_id` in `localStorage` and re-fetches `GET /conversation/{id}` on load, which is why a refresh keeps the thread. Everything — types, the three fetches, the backend URL — lives in `components/twin.tsx`; there is deliberately no `lib/` in this project, partly because the root `.gitignore`'s Python `lib/` rule would swallow it (`saas/lib/` needed an explicit negation). `API_BASE` and the chat call both read `process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'`, inlined at build time. Assistant replies render through `react-markdown`; user messages stay plain text so nothing a visitor types is interpreted.
 
-`lambda_handler.py` wraps the app in Mangum, and `uv run deploy.py` builds `lambda-deployment.zip` by pip-installing into the official Lambda image (so the wheels are manylinux x86_64, not macOS arm64). **It stops at the zip** — there is no upload step and no Lambda function for the twin yet, so deploying means creating the function and uploading by hand. The zip lands around 29 MB against Lambda's 50 MB limit for a direct upload, so it goes via S3 or a container image if it grows.
+`lambda_handler.py` wraps the app in Mangum. `uv run deploy.py` builds `lambda-deployment.zip` by pip-installing inside the official Lambda image (so the wheels are manylinux x86_64, not macOS arm64) and stops there; `scripts/deploy.sh` is what chains zip → `terraform apply` → `npm run build` → `aws s3 sync`. The zip is ~29 MB against Lambda's 50 MB direct-upload limit.
 
-Unlike saas, this backend does **not** serve the frontend — they deploy separately, so CORS matters (`CORS_ORIGINS`, comma-separated).
+Unlike saas, this backend does **not** serve the frontend — they deploy separately, so CORS matters. Terraform sets `CORS_ORIGINS` to that workspace's CloudFront URL, which means **the deployed API rejects `http://localhost:3000` by default**: a local frontend pointed at a deployed API fails preflight with `400 Disallowed CORS origin` while curl keeps working, because curl does not enforce CORS. Append localhost to that variable if you want to develop against deployed infrastructure.
+
+### Two deploy traps, both already hit
+
+- **`.env.local` beats `.env.production`.** `deploy.sh` writes the API Gateway URL into `.env.production`, but Next.js ranks `.env.local` higher, so a leftover `.env.local` silently wins and you upload a frontend pointing at the wrong backend. The symptom is a deploy that "succeeds" while the live site talks to a previous stack. Check with `grep -ro "execute-api[^\"']*" out/_next/static/chunks/ | sort -u` before syncing.
+- **Terraform must be the native arm64 build on Apple Silicon.** Terraform downloads the provider matching its *own* architecture, so an Intel Terraform pulls the 828 MB `darwin_amd64` AWS provider and then cannot start it through Rosetta before the handshake times out — surfacing as `Failed to load plugin schemas ... timeout while waiting for plugin to start`. Fix: `brew install hashicorp/tap/terraform` (Homebrew core dropped the formula), make sure `/opt/homebrew/bin` precedes `/usr/local/bin`, then `rm -rf .terraform .terraform.lock.hcl && terraform init`.
 
 ## saas architecture
 
@@ -171,7 +196,7 @@ Everything matching `.env*` is gitignored. `saas/.env` is the one the shell comm
 - `DEFAULT_AWS_REGION`, `AWS_ACCOUNT_ID` — used by the ECR/Lambda commands
 - `DYNAMODB_TABLE` — set it and the app uses DynamoDB; unset and it uses SQLite
 - `DB_PATH` — SQLite file when DynamoDB is off (default `/tmp/medinotes.db`)
-- twin only: `NEXT_PUBLIC_API_URL` (frontend, build-time), `CORS_ORIGINS`, `MEMORY_DIR`, `USE_S3`, `S3_BUCKET`
+- twin only: `NEXT_PUBLIC_API_URL` (frontend, build-time — `deploy.sh` writes it to `.env.production`), `CORS_ORIGINS`, `MEMORY_DIR`, `USE_S3`, `S3_BUCKET`. Terraform sets the backend three from `twin/terraform/main.tf`, not from any file you edit.
 - `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM`, `CLINIC_NAME` — patient email; incomplete means the send endpoint returns 503 and the composer falls back to the clinician's own mail client
 
 Two traps in `saas/.env.local`, both already hit once:
