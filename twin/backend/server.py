@@ -86,6 +86,10 @@ MEMORY_DIR = os.getenv(
     "../memory"
 )
 
+# Demo limits, both reset at midnight (server clock, UTC on Lambda)
+MESSAGES_PER_USER = int(os.getenv("MESSAGES_PER_USER", "3"))
+MESSAGES_PER_DAY = int(os.getenv("MESSAGES_PER_DAY", "50"))
+
 
 # =========================================================
 # S3 Client
@@ -102,11 +106,14 @@ if USE_S3:
 class ChatRequest(BaseModel):
     message: str
     session_id: Optional[str] = None
+    # Per-browser id that survives "New chat"; the per-user limit counts on it
+    visitor_id: Optional[str] = None
 
 
 class ChatResponse(BaseModel):
     response: str
     session_id: str
+    remaining: int
 
 
 class Message(BaseModel):
@@ -238,6 +245,44 @@ def save_conversation(
                 f,
                 indent=2
             )
+
+
+# =========================================================
+# Daily Limits
+# =========================================================
+
+def today() -> str:
+    # Same clock that writes message timestamps below
+    return datetime.now().date().isoformat()
+
+
+def usage_key() -> str:
+    # Stored beside the conversations; session ids are UUIDs,
+    # so this key can never collide with one.
+    return f"usage-{today()}"
+
+
+def load_usage() -> Dict:
+    # {"count": <all messages today>, "visitors": {<id>: <n>}}
+    return load_conversation(usage_key()) or {"count": 0, "visitors": {}}
+
+
+def remaining(usage: Dict, visitor_id: str) -> int:
+    return max(0, min(
+        MESSAGES_PER_USER - usage["visitors"].get(visitor_id, 0),
+        MESSAGES_PER_DAY - usage["count"]
+    ))
+
+
+def check_uuid(value: str, what: str) -> str:
+    # Only browser/server-minted UUIDs; they become storage keys
+    try:
+        return str(uuid.UUID(value))
+    except (ValueError, TypeError, AttributeError):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid {what}"
+        )
 
 
 # =========================================================
@@ -558,11 +603,13 @@ async def root():
 # =========================================================
 
 @app.get("/health")
-async def health_check():
+async def health_check(visitor_id: Optional[str] = None):
 
     return {
         "status": "healthy",
         "use_s3": USE_S3,
+        "messages_per_user": MESSAGES_PER_USER,
+        "remaining": remaining(load_usage(), visitor_id or ""),
         "bedrock_model": BEDROCK_MODEL_ID
     }
 
@@ -590,6 +637,14 @@ async def chat(
             or str(uuid.uuid4())
         )
 
+        session_id = check_uuid(session_id, "session id")
+
+        # Older frontends send no visitor id: count the session instead
+        visitor_id = check_uuid(
+            request.visitor_id or session_id,
+            "visitor id"
+        )
+
         # -------------------------------------------------
         # Load Previous Conversation
         # -------------------------------------------------
@@ -597,6 +652,33 @@ async def chat(
         conversation = load_conversation(
             session_id
         )
+
+        # -------------------------------------------------
+        # Daily limits
+        # -------------------------------------------------
+
+        usage = load_usage()
+
+        if usage["visitors"].get(visitor_id, 0) >= MESSAGES_PER_USER:
+
+            raise HTTPException(
+                status_code=429,
+                detail=(
+                    f"You've used your {MESSAGES_PER_USER} "
+                    f"messages for today. Come back tomorrow!"
+                )
+            )
+
+        if usage["count"] >= MESSAGES_PER_DAY:
+
+            raise HTTPException(
+                status_code=429,
+                detail=(
+                    "The twin has reached today's limit of "
+                    f"{MESSAGES_PER_DAY} messages. "
+                    "Please try again tomorrow."
+                )
+            )
 
         # -------------------------------------------------
         # Call Bedrock
@@ -646,13 +728,23 @@ async def chat(
             conversation
         )
 
+        # ponytail: read-modify-write, two Lambdas at once
+        # can lose an increment; use a DynamoDB atomic
+        # counter if the cap must be exact.
+        usage["count"] += 1
+        usage["visitors"][visitor_id] = (
+            usage["visitors"].get(visitor_id, 0) + 1
+        )
+        save_conversation(usage_key(), usage)
+
         # -------------------------------------------------
         # Return Response
         # -------------------------------------------------
 
         return ChatResponse(
             response=assistant_response,
-            session_id=session_id
+            session_id=session_id,
+            remaining=remaining(usage, visitor_id)
         )
 
     # =====================================================

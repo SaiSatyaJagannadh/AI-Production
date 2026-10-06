@@ -31,6 +31,21 @@ function formatTime(iso: string): string {
 }
 
 const SESSION_KEY = 'twin.session-id';
+const VISITOR_KEY = 'twin.visitor-id';
+
+// Survives "New chat", so the per-visitor daily limit isn't reset by it.
+function visitorId(): string {
+  try {
+    let id = localStorage.getItem(VISITOR_KEY);
+    if (!id) {
+      id = crypto.randomUUID();
+      localStorage.setItem(VISITOR_KEY, id);
+    }
+    return id;
+  } catch {
+    return '';
+  }
+}
 
 const STARTERS = [
   'What are you working on right now?',
@@ -72,6 +87,9 @@ export default function Twin({ name = 'DJ' }: { name?: string }) {
   const [error, setError] = useState('');
   const [offline, setOffline] = useState(false);
   const [restoring, setRestoring] = useState(true);
+  // Daily allowance, set by the backend; null until it has answered.
+  const [perUser, setPerUser] = useState(0);
+  const [remaining, setRemaining] = useState<number | null>(null);
 
   const threadRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -91,9 +109,16 @@ export default function Twin({ name = 'DJ' }: { name?: string }) {
       }
 
       try {
-        const health = await fetch(`${API_BASE}/health`);
+        const health = await fetch(
+          `${API_BASE}/health?visitor_id=${encodeURIComponent(visitorId())}`,
+        );
         if (!health.ok) throw new Error(`health ${health.status}`);
-        if (!cancelled) setOffline(false);
+        const status: { messages_per_user: number; remaining: number } = await health.json();
+        if (!cancelled) {
+          setOffline(false);
+          setPerUser(status.messages_per_user);
+          setRemaining(status.remaining);
+        }
       } catch {
         if (!cancelled) {
           setOffline(true);
@@ -165,7 +190,7 @@ export default function Twin({ name = 'DJ' }: { name?: string }) {
   const send = useCallback(
     async (text: string) => {
       const trimmed = text.trim();
-      if (!trimmed || isLoading) return;
+      if (!trimmed || isLoading || remaining === 0) return;
 
       setError('');
       setInput('');
@@ -190,15 +215,19 @@ export default function Twin({ name = 'DJ' }: { name?: string }) {
             body: JSON.stringify({
               message: trimmed,
               session_id: sessionId || undefined,
+              visitor_id: visitorId() || undefined,
             }),
           },
         );
         if (!response.ok) {
+          if (response.status === 429) setRemaining(0);
           const detail = await response.json().catch(() => null);
           throw new Error(detail?.detail || `The twin returned ${response.status}.`);
         }
-        const result: { response: string; session_id: string } = await response.json();
+        const result: { response: string; session_id: string; remaining: number } =
+          await response.json();
         setOffline(false);
+        setRemaining(result.remaining);
 
         if (!sessionId) {
           setSessionId(result.session_id);
@@ -230,7 +259,7 @@ export default function Twin({ name = 'DJ' }: { name?: string }) {
         setIsLoading(false);
       }
     },
-    [isLoading, sessionId],
+    [isLoading, sessionId, remaining],
   );
 
   function startOver() {
@@ -311,6 +340,11 @@ export default function Twin({ name = 'DJ' }: { name?: string }) {
               I can talk through {name}&rsquo;s background, projects and the kind of work
               he&rsquo;s looking for. Ask me anything.
             </p>
+            {perUser > 0 && (
+              <p className="mt-3 text-sm font-medium text-accent">
+                This demo allows {perUser} messages per visitor per day.
+              </p>
+            )}
             <div className="mt-6 grid gap-2 text-left">
               {STARTERS.map((starter) => (
                 <button
@@ -420,19 +454,32 @@ export default function Twin({ name = 'DJ' }: { name?: string }) {
                 send(input);
               }
             }}
-            placeholder={`Message ${name}'s twin…`}
-            disabled={isLoading}
+            placeholder={
+              remaining === 0 ? 'Daily message limit reached' : `Message ${name}'s twin…`
+            }
+            disabled={isLoading || remaining === 0}
             className="max-h-40 flex-1 resize-none bg-transparent px-2 py-1.5 text-[15px] leading-relaxed outline-none placeholder:text-muted disabled:cursor-not-allowed"
           />
           <button
             type="submit"
-            disabled={!input.trim() || isLoading}
+            disabled={!input.trim() || isLoading || remaining === 0}
             aria-label="Send message"
             className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-accent text-on-accent transition-colors hover:bg-accent-strong disabled:cursor-not-allowed disabled:opacity-40"
           >
             <ArrowUp className="h-4 w-4" />
           </button>
         </form>
+        {remaining !== null && (
+          <p
+            className={`mt-2 px-1 text-center text-xs font-medium ${
+              remaining === 0 ? 'text-red-600 dark:text-red-400' : 'text-muted'
+            }`}
+          >
+            {remaining === 0
+              ? 'No messages left today — the limit resets at midnight UTC.'
+              : `${remaining} message${remaining === 1 ? '' : 's'} left today`}
+          </p>
+        )}
         <p className="mt-2 px-1 text-center text-[11px] text-muted">
           An AI twin — it can get things wrong. Enter to send, Shift+Enter for a new line.
         </p>
