@@ -31,7 +31,9 @@ Ed Donner's "AI in Production" course repo. Most of it is **instructional markdo
 # twin/ — backend then frontend, in two terminals
 cd twin/backend && uv sync && uv run uvicorn server:app --reload --port 8000
 cd twin/frontend && npm install && npm run dev   # no .env.local = talks to localhost:8000
-# twin has no tests; verify by chatting, then reloading the page (history should survive)
+# twin has no tests; verify by chatting, then reloading the page (history should survive).
+# Offline, stub Bedrock: in Python, `server.call_bedrock = lambda c, m: "ok"` then drive
+# `fastapi.testclient.TestClient(server.app)` with MEMORY_DIR pointed at a temp dir.
 
 # twin/ — full deploy (lambda zip + terraform apply + frontend build + s3 sync)
 cd twin && ./scripts/deploy.sh dev        # workspace name: dev | test | prod
@@ -109,11 +111,17 @@ A personal "digital twin" chat: `twin/frontend` (App Router) talks to `twin/back
 - Paths resolve from `Path(__file__).parent`, never the working directory — the server runs from `backend/` locally and `/var/task` on Lambda.
 - The PDF lookup is case-insensitive because the file is committed as `Linkedin.pdf` while the code asked for `linkedin.pdf`. On macOS that resolves; on Lambda's Linux filesystem it silently degrades to "LinkedIn profile not available", and the twin gets vague without any error.
 
-**Memory** is per-session JSON, keyed by a `session_id` the backend mints on the first message: local files under `MEMORY_DIR` (default `twin/memory/`, gitignored — real transcripts) or S3 objects when `USE_S3=true` and `S3_BUCKET` is set. Only the **last 10 messages** are replayed into the prompt, so long conversations lose their early context by design.
+**Memory** is per-session JSON, keyed by a `session_id` the backend mints on the first message: local files under `MEMORY_DIR` (default `twin/memory/`, gitignored — real transcripts) or S3 objects when `USE_S3=true` and `S3_BUCKET` is set. Only the **last 50 messages** (`conversation[-50:]` in `call_bedrock`) are replayed into the prompt, so long conversations lose their early context by design.
+
+**The model is AWS Bedrock, not OpenAI** — `server.py` calls the Converse API with `BEDROCK_MODEL_ID` (Terraform sets it from `terraform.tfvars`: `amazon.nova-micro-v1:0` in dev, `nova-lite` in `prod.tfvars`). The persona goes in Converse's `system` field, and history is filtered to `user`/`assistant` roles because Converse rejects anything else. The client reads `DEFAULT_AWS_REGION` (default `us-east-1`), which Lambda does not set, so the deployed twin calls Bedrock in us-east-1 even though the function lives in us-east-2.
+
+**Demo limits** — `/chat` returns 429 once a visitor has sent `MESSAGES_PER_USER` (default 3) messages today or the whole site has sent `MESSAGES_PER_DAY` (default 50); both reset at midnight on the server clock (UTC on Lambda). The counts live in one storage object per day, `usage-YYYY-MM-DD`, beside the conversations: `{"count": n, "visitors": {<id>: n}}`. "Visitor" is a `visitor_id` UUID the frontend keeps in `localStorage` under `twin.visitor-id`, separate from the session id so the **New chat** button doesn't refill the allowance; a request without one falls back to the session id. Incognito still gets a fresh 3 — the daily total is the real cap. The counter is read-modify-write, so concurrent Lambdas can lose an increment. Both ids must parse as UUIDs (`check_uuid`), since they become storage keys and that also keeps a client from naming the `usage-` object. The frontend learns its allowance from `GET /health?visitor_id=` (`messages_per_user`, `remaining`) and each chat reply's `remaining`, then shows the countdown and locks the composer at 0. That makes frontend and backend a matched pair: deploy the Lambda first, or the new UI renders a countdown from a field the old backend doesn't send.
 
 The frontend keeps that `session_id` in `localStorage` and re-fetches `GET /conversation/{id}` on load, which is why a refresh keeps the thread. Everything — types, the three fetches, the backend URL — lives in `components/twin.tsx`; there is deliberately no `lib/` in this project, partly because the root `.gitignore`'s Python `lib/` rule would swallow it (`saas/lib/` needed an explicit negation). `API_BASE` and the chat call both read `process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'`, inlined at build time. Assistant replies render through `react-markdown`; user messages stay plain text so nothing a visitor types is interpreted.
 
-`lambda_handler.py` wraps the app in Mangum. `uv run deploy.py` builds `lambda-deployment.zip` by pip-installing inside the official Lambda image (so the wheels are manylinux x86_64, not macOS arm64) and stops there; `scripts/deploy.sh` is what chains zip → `terraform apply` → `npm run build` → `aws s3 sync`. The zip is ~29 MB against Lambda's 50 MB direct-upload limit.
+`lambda_handler.py` wraps the app in Mangum. `uv run deploy.py` builds `lambda-deployment.zip` by pip-installing inside the official Lambda image (so the wheels are manylinux x86_64, not macOS arm64) and stops there; `scripts/deploy.sh` is what chains zip → `terraform apply` → `npm run build` → `aws s3 sync`. The zip is ~29 MB against Lambda's 50 MB direct-upload limit, so it can also be uploaded by hand (console, or `aws lambda update-function-code --function-name twin-dev-api --zip-file fileb://backend/lambda-deployment.zip`).
+
+**Terraform owns the Lambda's code and environment.** `main.tf` pins the code to `filebase64sha256` of the local zip and declares the whole `environment` block, so the next `terraform apply` reverts any console edit to either — a hand-uploaded zip is replaced by whatever zip is on disk, and env vars added in the console (`MESSAGES_PER_USER`, `MESSAGES_PER_DAY`) disappear. To make a setting stick, add it to that block. API Gateway also throttles (`api_throttle_*` in the tfvars: 5 rps / burst 10 in dev).
 
 Unlike saas, this backend does **not** serve the frontend — they deploy separately, so CORS matters. Terraform sets `CORS_ORIGINS` to that workspace's CloudFront URL, which means **the deployed API rejects `http://localhost:3000` by default**: a local frontend pointed at a deployed API fails preflight with `400 Disallowed CORS origin` while curl keeps working, because curl does not enforce CORS. Append localhost to that variable if you want to develop against deployed infrastructure.
 
@@ -196,7 +204,7 @@ Everything matching `.env*` is gitignored. `saas/.env` is the one the shell comm
 - `DEFAULT_AWS_REGION`, `AWS_ACCOUNT_ID` — used by the ECR/Lambda commands
 - `DYNAMODB_TABLE` — set it and the app uses DynamoDB; unset and it uses SQLite
 - `DB_PATH` — SQLite file when DynamoDB is off (default `/tmp/medinotes.db`)
-- twin only: `NEXT_PUBLIC_API_URL` (frontend, build-time — `deploy.sh` writes it to `.env.production`), `CORS_ORIGINS`, `MEMORY_DIR`, `USE_S3`, `S3_BUCKET`. Terraform sets the backend three from `twin/terraform/main.tf`, not from any file you edit.
+- twin only: `NEXT_PUBLIC_API_URL` (frontend, build-time — `deploy.sh` writes it to `.env.production`), `CORS_ORIGINS`, `MEMORY_DIR`, `USE_S3`, `S3_BUCKET`, `BEDROCK_MODEL_ID`, `MESSAGES_PER_USER`, `MESSAGES_PER_DAY`. Terraform sets the first four backend ones from `twin/terraform/main.tf`, not from any file you edit; the two limits fall back to code defaults.
 - `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM`, `CLINIC_NAME` — patient email; incomplete means the send endpoint returns 503 and the composer falls back to the clinician's own mail client
 
 Two traps in `saas/.env.local`, both already hit once:
