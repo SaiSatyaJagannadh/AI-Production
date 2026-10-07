@@ -2,15 +2,31 @@
 
 # 🚀 AI in Production — my build log
 
-### Shipping Gen AI apps all the way to a real URL: Vercel → Docker → Amazon ECR → AWS Lambda.
+### Two Gen AI apps shipped all the way to a real URL: one as a Docker container on AWS Lambda, one as a Terraform-managed serverless stack.
 
-[![Live Demo](https://img.shields.io/badge/▶_Live_Demo-MediNotes_Pro-0e7c74?style=for-the-badge)](https://55ncfzx5whditvl2364jsjk3gy0twvlw.lambda-url.us-east-2.on.aws/)
+[![MediNotes Pro](https://img.shields.io/badge/▶_Live-MediNotes_Pro-0e7c74?style=for-the-badge)](https://55ncfzx5whditvl2364jsjk3gy0twvlw.lambda-url.us-east-2.on.aws/)
+[![Digital Twin](https://img.shields.io/badge/▶_Live-Digital_Twin-6C47FF?style=for-the-badge)](https://do2s1pa4farox.cloudfront.net)
 [![AWS Lambda](https://img.shields.io/badge/Running_on-AWS_Lambda-FF9900?style=for-the-badge&logo=awslambda&logoColor=white)](https://aws.amazon.com/lambda/)
-[![Read the build](https://img.shields.io/badge/📖_Full_writeup-saas%2FREADME-6C47FF?style=for-the-badge)](saas/README.md)
+[![Terraform](https://img.shields.io/badge/Infra-Terraform-7B42BC?style=for-the-badge&logo=terraform&logoColor=white)](twin/terraform/main.tf)
 
 </div>
 
-## 🩺 The flagship project — MediNotes Pro
+## ✨ The two projects at a glance
+
+| | 🩺 [MediNotes Pro](saas/README.md) | 🤖 [Digital Twin](twin/README.md) |
+|---|---|---|
+| **Live** | [lambda-url…on.aws](https://55ncfzx5whditvl2364jsjk3gy0twvlw.lambda-url.us-east-2.on.aws/) | [do2s1pa4farox.cloudfront.net](https://do2s1pa4farox.cloudfront.net) |
+| **What it does** | Turns a clinician's shorthand into a chart summary, next steps, red flags and a patient email | Answers questions about my background, in my voice, from my real LinkedIn and notes |
+| **Frontend** | Next.js 16 Pages Router, static export, served by the API | Next.js 16 App Router, static export on S3 + CloudFront |
+| **Backend** | FastAPI streaming SSE | FastAPI JSON API via Mangum |
+| **Model** | OpenAI `gpt-5-nano` | AWS Bedrock, Amazon Nova |
+| **Hosting** | One Docker image → ECR → Lambda Function URL + Web Adapter | Lambda zip + HTTP API Gateway + CloudFront |
+| **Infra** | Docker + AWS CLI | **Terraform**, `dev` / `test` / `prod` workspaces, one-command deploy & destroy |
+| **Data** | SQLite or DynamoDB (picked by one env var), every query scoped to the signed-in clinician | Conversations in S3, survive a page refresh |
+| **Access control** | Clerk sign-in + paid-subscription gate | Usage limits: 3 messages per visitor per day, 50 site-wide, plus API throttling |
+| **Write-up** | 📖 [`saas/README.md`](saas/README.md) | 📖 [`twin/README.md`](twin/README.md) |
+
+## 🩺 Project 1 — MediNotes Pro
 
 **Live 👉 https://55ncfzx5whditvl2364jsjk3gy0twvlw.lambda-url.us-east-2.on.aws/**
 
@@ -31,11 +47,27 @@ Next.js 16 static export  →  FastAPI + SSE  →  Lambda Web Adapter (response_
 
 📖 **Architecture diagrams, the deploy pipeline and the three bugs that cost me an evening: [`saas/README.md`](saas/README.md)**
 
+## 🤖 Project 2 — Digital Twin
+
+**Live 👉 https://do2s1pa4farox.cloudfront.net**
+
+Recruiters can chat with an AI version of me. It answers from my real LinkedIn profile, summary, writing style and facts, which are assembled into the prompt at startup, and it remembers the conversation across page refreshes.
+
+The point of this one is the infrastructure. The whole stack (S3 buckets, CloudFront, API Gateway with throttling, Lambda, the IAM role and an optional custom domain with ACM + Route 53) is **Terraform**, so `./scripts/deploy.sh dev` builds it from nothing and `./scripts/destroy.sh dev` removes it. Because it's a public link, it has guardrails: each visitor gets 3 messages a day with a live countdown in the UI, and the whole site is capped at 50 a day, so the Bedrock bill can't run away.
+
+```
+Next.js 16 static export on S3 + CloudFront  →  API Gateway (throttled)  →  Lambda (FastAPI + Mangum)
+        AWS Bedrock Amazon Nova  ·  S3 conversation memory  ·  Terraform workspaces dev / test / prod
+```
+
+📖 **Architecture, what I built on top of the course and the production-only bugs: [`twin/README.md`](twin/README.md)**
+
 ### 🗺️ What's in this repo
 
 | Folder | What it is |
 |---|---|
 | [`saas/`](saas/) | 🩺 **MediNotes Pro** — the full-stack app above (Next.js + FastAPI + Docker + Lambda) |
+| [`twin/`](twin/) | 🤖 **Digital Twin** — AI chat persona (Next.js + FastAPI + Bedrock, deployed with Terraform) |
 | [`instant/`](instant/) | ⚡ Production deploy in under 10 minutes — a single FastAPI file on Vercel |
 | [`finale/`](finale/) | 🤖 Agents on AWS Bedrock AgentCore with Strands (tools, code interpreter, observability) |
 | [`week1/`](week1/) – [`week4/`](week4/) | 📓 The day-by-day guides I worked through |
