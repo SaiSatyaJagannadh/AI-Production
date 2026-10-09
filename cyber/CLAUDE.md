@@ -1,173 +1,66 @@
-# Project Context for Claude Code
+# CLAUDE.md
 
-## Overall context
-- This is a project being developed as part of Ed's course "AI in Production"
-- Ed is writing this code which thousands of students will clone; they will then follow the steps to deploy
-- Students may be on Windows PC, Mac or Linux; the instructions needs to work on all systems
-- This project is called Cybersecurity Analyzer - it runs an Agent
-- The project will be deployed locally with npm and uv run (working), also locally as a single Docker container (working), to Azure Container App (working), and to GCP Cloud Run (not started)
-- The project root is ~/projects/cyber
-- There is a .env file in the project root; you may not be able to see it for security reasons, but it's there, with OPENAI_API_KEY and SEMGREP_APP_TOKEN
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Project Overview
-Cybersecurity Analyzer - A web application for analyzing Python code for security vulnerabilities using AI-powered analysis with OpenAI and Semgrep.
+## What this is
 
-**Educational Purpose**: This project serves as a teaching tool for students learning cloud deployment on Azure and Google Cloud Platform. Students will gain hands-on experience deploying containerized applications using modern serverless platforms.
+**Cybersecurity Analyzer**, the week 3 project of Ed Donner's "AI in Production" course, vendored into `production-main/cyber/` from `ed-donner/cyber` (its `.git` was removed, so it is plain files in the parent repo, not a submodule, and `git pull` will not fetch Ed's updates). A visitor uploads or pastes Python; an OpenAI Agents SDK agent runs Semgrep over it through an MCP server, adds its own review, and returns a structured report sorted by CVSS.
+
+The step-by-step guides are in `week3/`: `day1.part0` (local + Docker), `day1.part1`/`part2` (Azure Container Apps), `day2.part1`/`part2` (GCP Cloud Run). Ed's original notes assumed the project lives at `~/projects/cyber` and that students may be on Windows, Mac or Linux — guide instructions should keep working on all three.
+
+## Commands
+
+`.env` lives in this folder (`cyber/.env`, gitignored) with `OPENAI_API_KEY` and `SEMGREP_APP_TOKEN`. `load_dotenv()` walks up from `backend/`, so it is found without being copied.
+
+```bash
+# local, two terminals
+cd backend && uv run server.py          # API on :8000
+cd frontend && npm install && npm run dev   # UI on :3000
+
+# quality — there are no tests
+cd frontend && npm run lint && npx tsc --noEmit   # there is no `typecheck` script
+
+# smoke test the API (takes ~30 s; the first run after a fresh install often times out in Semgrep — retry)
+curl -X POST localhost:8000/api/analyze -H 'Content-Type: application/json' \
+  -d "$(python3 -c 'import json;print(json.dumps({"code":open("airline.py").read()}))')"
+
+# single container (frontend + API on :8000)
+docker build -t cyber-analyzer .
+docker run --rm --name cyber-analyzer -p 8000:8000 --env-file .env cyber-analyzer
+
+# cloud — workspace name matches the folder (azure | gcp); GCP also needs TF_VAR_project_id
+cd terraform/azure && terraform init && terraform workspace new azure
+terraform apply   -var="openai_api_key=$OPENAI_API_KEY" -var="semgrep_app_token=$SEMGREP_APP_TOKEN"
+terraform output app_url
+terraform destroy -var="openai_api_key=$OPENAI_API_KEY" -var="semgrep_app_token=$SEMGREP_APP_TOKEN"
+```
+
+`airline.py` at the root is the deliberately vulnerable sample to analyze (SQL injection, `eval`).
+
+**Port 8000 is shared with `twin/` and `saas/` in the parent repo.** On macOS a twin `uvicorn` bound to `127.0.0.1:8000` and this server bound to `0.0.0.0:8000` can both start, and `localhost` reaches the twin one — every upload then 404s and the UI reports an analysis error while `/health` looks healthy (twin's `/health` answers too). Check with `lsof -nP -iTCP:8000 -sTCP:LISTEN` before debugging the code.
 
 ## Architecture
-- **Frontend**: Next.js (React) with TypeScript, Tailwind CSS
-  - Located in `frontend/`
-  - Runs on port 3000 in development
-  - Built as static export for production
-- **Backend**: FastAPI with Python 3.12
-  - Located in `backend/`
-  - Runs on port 8000
-  - Uses OpenAI Agents SDK with Semgrep MCP server
 
-## Key Technical Decisions
+One request is the whole system: `POST /api/analyze {code}` → `run_security_analysis()` in `backend/server.py`:
 
-### Docker Deployment (July 31, 2025)
-- Simplified from multi-stage supervisor approach to single-stage deployment
-- Frontend is built as static export (`next export`) and served directly by FastAPI
-- Single container exposes port 8000 for both API and static files
-- Optimized for Google Cloud Run and Azure Container Instances
+1. **A fresh Semgrep MCP server per request.** `mcp_servers.py` launches `semgrep mcp` (the MCP server built into the `semgrep` package, not the separate `semgrep-mcp`) over stdio, exposes only the `semgrep_scan` tool, with a 240 s session timeout. Because the subprocess exits after every request, its OpenTelemetry handler prints `RuntimeError: can't create new thread at interpreter shutdown` each time — harmless noise; the `200 OK` after it is the real result.
+2. **The code is written to a temp `.py` file**, because `semgrep_scan` takes a path, and deleted in `finally`.
+3. **The agent** (`gpt-4.1-mini`, `output_type=SecurityReport`) is driven by `SECURITY_RESEARCHER_INSTRUCTIONS` in `context.py`, which insists on exactly one `semgrep_scan` call with `config: "auto"` — the model otherwise invents rule-pack names and re-calls the tool. The summary must say "Semgrep found X issues, and I identified Y additional issues".
+4. Issues are sorted by `cvss_score` descending, and `enhance_summary()` prefixes the character count.
 
-### MCP Version Pinning (July 31, 2025)
-- **Issue**: MCP library updated from 1.12.2 to 1.12.3 on July 31, 2025
-- **Breaking Change**: FastMCP no longer accepts `version` parameter in constructor
-- **Solution**: Pin MCP to version 1.12.2 in `pyproject.toml` and use `uvx --with mcp==1.12.2` when launching semgrep-mcp
-- **Reason**: semgrep-mcp v0.4.1 still passes the `version` parameter, causing TypeError with MCP 1.12.3
+**`SecurityReport` / `SecurityIssue` (pydantic, `server.py`) are a contract with `frontend/src/types/security.ts`** — change a field in one and change it in the other; `severity` is one of `critical|high|medium|low`.
 
-## Development Setup
+**Frontend** is Next.js App Router, a single page (`src/app/page.tsx` + three components). `next.config.ts` has `output: 'export'`, `trailingSlash: true`, `images.unoptimized: true`. `API_BASE_URL` is `NEXT_PUBLIC_API_URL`, else `http://localhost:8000` only when `NODE_ENV=development` *and* the page is on `localhost`, else `''` — so the production bundle uses relative URLs and works on whatever domain serves it.
 
-### Environment Variables
-Required in `.env` file:
-- `OPENAI_API_KEY` - For OpenAI API access
-- `SEMGREP_APP_TOKEN` - For Semgrep analysis
+**Production is one container.** The Dockerfile is multi-stage: Node builds the static export, then a `python:3.12-slim` stage runs `uv sync --frozen`, installs semgrep, and copies `out/` to `static/`. `server.py` mounts `static/` at `/` only if it exists, and that mount must stay after the `/api/analyze` and `/health` routes or it swallows them. With `ENVIRONMENT=production` (set by both Terraform configs) CORS adds `*`, since the frontend is same-origin anyway.
 
-### Local Development
-```bash
-# Backend
-cd backend
-uv run server.py
+**Terraform** (`terraform/azure`, `terraform/gcp`) uses the Docker provider to build (`platform = "linux/amd64"`) and push the image, then deploys Azure Container Apps (ACR + Log Analytics) or Cloud Run (Artifact Registry, public `run.invoker`). Keys are passed as `-var`s and set as plain container env vars. State is local and gitignored, along with `terraform.tfvars` and `*.auto.tfvars`.
 
-# Frontend (in separate terminal)
-cd frontend
-npm run dev
-```
+## Traps already hit
 
-### Docker Commands
-```bash
-# Build
-docker build -t cyber-analyzer .
-
-# Run with env file
-docker run --rm -d --name cyber-analyzer -p 8000:8000 --env-file .env cyber-analyzer
-
-# Logs
-docker logs cyber-analyzer
-
-# Stop
-docker stop cyber-analyzer
-```
-
-## Important Implementation Details
-
-1. **Static File Serving**: FastAPI serves the Next.js static export from the `static` directory. The `/health` endpoint must be defined before mounting static files to avoid route conflicts.
-
-2. **API Routes**: All API endpoints are under `/api/` prefix (e.g., `/api/analyze`)
-
-3. **Frontend Configuration**: 
-   - `next.config.ts` uses `output: 'export'` for static generation
-   - `trailingSlash: true` for proper routing
-   - `images.unoptimized: true` for static export compatibility
-
-## Known Issues & Workarounds
-
-1. **MCP Version Compatibility**: Must use MCP 1.12.2 until semgrep-mcp is updated to remove the `version` parameter from FastMCP initialization.
-
-## Testing & Quality
-- Run `npm run lint` in frontend for linting
-- Run `npm run typecheck` in frontend for type checking
-- Backend uses `uv` for dependency management
-
-## Future Considerations
-- Monitor semgrep-mcp updates for compatibility with MCP 1.12.3+
-- Consider adding automated tests
-- May need to adjust Docker health check timeout for cloud deployments
-
-## Cloud Deployment Project (Started July 31, 2025)
-
-### Educational Objectives
-- Teach students practical cloud deployment skills on Azure and GCP
-- Compare/contrast serverless container platforms (Azure Container Apps vs Cloud Run)
-- Hands-on experience with Terraform for infrastructure as code
-- Understanding of cloud security, secrets management, and cost optimization
-
-### Deployment Strategy
-1. **Phase 1 - Azure Deployment**
-   - Azure Container Apps (serverless container platform)
-   - Azure Container Registry for image storage
-   - Azure Key Vault for secrets management
-   - Student accounts via Azure for Students ($100 credit)
-
-2. **Phase 2 - GCP Deployment**
-   - Google Cloud Run (equivalent to Azure Container Apps)
-   - Artifact Registry for container images
-   - Secret Manager for environment variables
-   - Student accounts via GCP Free Tier + $300 credit
-
-3. **Infrastructure as Code**
-   - Terraform with workspaces to manage both clouds
-   - Modular design for reusable components
-   - Clear separation between Azure and GCP configurations
-
-### Teaching Approach
-- Start with Azure (less familiar to most students)
-- Progress to GCP for comparison
-- Focus on practical skills: account setup, cost management, security
-- Emphasis on understanding trade-offs between platforms
-
-### Prerequisites Covered in Previous Classes
-- AWS App Runner deployment
-- Basic Terraform concepts
-- Container fundamentals
-
-### Current Status (Updated July 31, 2025)
-- ✅ **Azure deployment completed** - Application successfully deployed to Azure Container Apps
-- ✅ **Docker image optimized** - Multi-stage build with ARM64→AMD64 cross-compilation for cloud compatibility
-- ✅ **Terraform deployment pipeline** - Working infrastructure-as-code setup with Azure workspace
-- ✅ **CORS and API routing resolved** - Frontend uses relative URLs in production, localhost in development
-- ✅ **MCP server issue RESOLVED** - Increased memory to 2.0Gi fixed Semgrep SIGKILL issue
-
-### MCP Server Memory Issue - RESOLVED (July 31, 2025)
-**Issue**: Semgrep MCP server was getting SIGKILL (-9) on Azure when loading rule registry
-- `list_tools` worked but `semgrep_scan` failed with exit code -9
-- Process killed right after "Loading rules from registry..."
-- **Root cause**: Insufficient memory allocation (1.0Gi) 
-- **Solution**: Increased container memory from 1.0Gi to 2.0Gi and CPU from 0.5 to 1.0
-- **Verified**: Works on both Azure Container Apps and Azure Container Instances with 2GB RAM
-- **Status**: ACI test resources destroyed, but terraform config kept in `azure-aci/` for future reference
-
-**Key lesson**: Semgrep rule registry loading is memory-intensive and requires at least 2GB RAM in cloud environments
-
-### Key Deployment Lessons Learned
-1. **Terraform Docker Provider Limitations**: 
-   - Doesn't automatically detect source code changes
-   - Must use `terraform taint` to force rebuilds when code changes
-   - Using unique image tags can help avoid caching issues
-
-2. **Frontend API URL Configuration**:
-   - Next.js static export needs relative URLs for same-domain deployment
-   - Environment-based logic: localhost in dev, relative URLs in production
-   - CORS must allow wildcard origins when serving frontend from same domain
-
-3. **Azure Container Apps Behavior**:
-   - FQDN changes with each new revision (--0000001, --0000002, etc.)
-   - Apps scale to zero automatically, saving costs
-   - Logs accessible via `az containerapp logs show`
-
-4. **Cross-Platform Docker Builds**:
-   - M1 Mac builds ARM64 by default, Azure needs AMD64
-   - Solution: `platform = "linux/amd64"` in Terraform Docker build
-   - Slight performance penalty on M1 Macs but ensures compatibility
+- **Semgrep needs 2 GiB.** At 1 GiB the container SIGKILLs (-9) right after "Loading rules from registry..." — `list_tools` works, `semgrep_scan` dies. Both Terraform configs set cpu 1 / memory 2Gi; don't lower them.
+- **`mcp==1.12.2` is pinned on purpose.** MCP 1.12.3 dropped FastMCP's `version` constructor argument, which the Semgrep MCP server still passed (`TypeError`). Re-test analysis before unpinning.
+- **Terraform's Docker provider doesn't see source changes** — a code edit followed by `terraform apply` redeploys the old image. Use `terraform taint docker_image.app` (or bump `docker_image_tag`).
+- **Apple Silicon builds arm64 by default**; Azure and Cloud Run need amd64, hence the `platform` setting (slower builds on M-series Macs).
+- **Azure Container Apps' FQDN changes with each revision** (`--0000001`, `--0000002`…) — re-read `terraform output app_url` rather than reusing an old link. Apps scale to zero; logs via `az containerapp logs show`.
+- "User doesn't have the Pro Engine installed" in the server log is a Semgrep upsell warning, not an error.
