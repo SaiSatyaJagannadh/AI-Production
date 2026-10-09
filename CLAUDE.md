@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this repo is
 
-Ed Donner's "AI in Production" course repo. Most of it is **instructional markdown** (`week1/`–`week4/`, `guides/*.ipynb`, `community_contributions/`) that walks a student through building and deploying apps. Four directories contain runnable code:
+Ed Donner's "AI in Production" course repo. Most of it is **instructional markdown** (`week1/`–`week4/`, `guides/*.ipynb`, `community_contributions/`) that walks a student through building and deploying apps. Five directories contain runnable code:
 
 | Dir | Stack | Deploy target |
 |---|---|---|
@@ -12,8 +12,11 @@ Ed Donner's "AI in Production" course repo. Most of it is **instructional markdo
 | `saas/` | Next.js (Pages Router) static export + FastAPI | Vercel **and** Docker → ECR → AWS Lambda |
 | `twin/` | Next.js **App Router** + FastAPI chat backend (week 2) | Terraform → Lambda + API Gateway + S3 + CloudFront |
 | `finale/` | Strands agents on AWS Bedrock AgentCore, `uv` project | AWS (`agentcore launch`) |
+| `cyber/` | Next.js App Router static export + FastAPI, OpenAI Agents SDK + Semgrep MCP (week 3) | Docker → Azure Container Apps / GCP Cloud Run via Terraform |
 
-`week3/` and `week4/` are pointers to other repos (`ed-donner/cyber`, `alex`) — no code for them here.
+`week3/` points at `ed-donner/cyber`, which is now vendored here as `cyber/` — plain files, its `.git` removed, so Ed's updates no longer arrive by `git pull`. It has its own `cyber/CLAUDE.md`; read that before working there. `week4/` still points at another repo (`alex`), with no code here.
+
+**`twin/`, `saas/` and `cyber/` backends all default to port 8000.** Two can be up at once on macOS (one bound to `127.0.0.1`, one to `0.0.0.0`), and `localhost` then silently reaches the wrong app — a frontend gets 404s from an API that answers `/health` fine. Run `lsof -nP -iTCP:8000 -sTCP:LISTEN` before debugging.
 
 **Three Lambdas are live in us-east-2, and only one of them is managed by Terraform:**
 
