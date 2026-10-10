@@ -2,29 +2,30 @@
 
 # 🚀 AI in Production — my build log
 
-### Two Gen AI apps shipped all the way to a real URL: one as a Docker container on AWS Lambda, one as a Terraform-managed serverless stack.
+### Three Gen AI apps taken toward production: a Docker container on AWS Lambda, a Terraform-managed serverless stack, and an AI security agent packaged for Azure and GCP.
 
 [![MediNotes Pro](https://img.shields.io/badge/▶_Live-MediNotes_Pro-0e7c74?style=for-the-badge)](https://55ncfzx5whditvl2364jsjk3gy0twvlw.lambda-url.us-east-2.on.aws/)
 [![Digital Twin](https://img.shields.io/badge/▶_Live-Digital_Twin-6C47FF?style=for-the-badge)](https://do2s1pa4farox.cloudfront.net)
 [![AWS Lambda](https://img.shields.io/badge/Running_on-AWS_Lambda-FF9900?style=for-the-badge&logo=awslambda&logoColor=white)](https://aws.amazon.com/lambda/)
+[![Cyber Analyzer](https://img.shields.io/badge/🛡️_Project-Cyber_Analyzer-C62828?style=for-the-badge)](cyber/)
 [![Terraform](https://img.shields.io/badge/Infra-Terraform-7B42BC?style=for-the-badge&logo=terraform&logoColor=white)](twin/terraform/main.tf)
 
 </div>
 
-## ✨ The two projects at a glance
+## ✨ The three projects at a glance
 
-| | 🩺 [MediNotes Pro](saas/README.md) | 🤖 [Digital Twin](twin/README.md) |
-|---|---|---|
-| **Live** | [lambda-url…on.aws](https://55ncfzx5whditvl2364jsjk3gy0twvlw.lambda-url.us-east-2.on.aws/) | [do2s1pa4farox.cloudfront.net](https://do2s1pa4farox.cloudfront.net) |
-| **What it does** | Turns a clinician's shorthand into a chart summary, next steps, red flags and a patient email | Answers questions about my background, in my voice, from my real LinkedIn and notes |
-| **Frontend** | Next.js 16 Pages Router, static export, served by the API | Next.js 16 App Router, static export on S3 + CloudFront |
-| **Backend** | FastAPI streaming SSE | FastAPI JSON API via Mangum |
-| **Model** | OpenAI `gpt-5-nano` | AWS Bedrock, Amazon Nova |
-| **Hosting** | One Docker image → ECR → Lambda Function URL + Web Adapter | Lambda zip + HTTP API Gateway + CloudFront |
-| **Infra** | Docker + AWS CLI | **Terraform**, `dev` / `test` / `prod` workspaces, one-command deploy & destroy |
-| **Data** | SQLite or DynamoDB (picked by one env var), every query scoped to the signed-in clinician | Conversations in S3, survive a page refresh |
-| **Access control** | Clerk sign-in + paid-subscription gate | Usage limits: 3 messages per visitor per day, 50 site-wide, plus API throttling |
-| **Write-up** | 📖 [`saas/README.md`](saas/README.md) | 📖 [`twin/README.md`](twin/README.md) |
+| | 🩺 [MediNotes Pro](saas/README.md) | 🤖 [Digital Twin](twin/README.md) | 🛡️ [Cyber Analyzer](cyber/) |
+|---|---|---|---|
+| **Live** | [lambda-url…on.aws](https://55ncfzx5whditvl2364jsjk3gy0twvlw.lambda-url.us-east-2.on.aws/) | [do2s1pa4farox.cloudfront.net](https://do2s1pa4farox.cloudfront.net) | Runs locally and in Docker; Terraform ready for Azure + GCP |
+| **What it does** | Turns a clinician's shorthand into a chart summary, next steps, red flags and a patient email | Answers questions about my background, in my voice, from my real LinkedIn and notes | Scans uploaded Python for vulnerabilities and returns fixes ranked by CVSS score |
+| **Frontend** | Next.js 16 Pages Router, static export, served by the API | Next.js 16 App Router, static export on S3 + CloudFront | Next.js 15 App Router, static export, served by the API |
+| **Backend** | FastAPI streaming SSE | FastAPI JSON API via Mangum | FastAPI + OpenAI Agents SDK, Semgrep as an MCP tool |
+| **Model** | OpenAI `gpt-5-nano` | AWS Bedrock, Amazon Nova | OpenAI `gpt-4.1-mini`, structured output |
+| **Hosting** | One Docker image → ECR → Lambda Function URL + Web Adapter | Lambda zip + HTTP API Gateway + CloudFront | One Docker image → Azure Container Apps or Google Cloud Run |
+| **Infra** | Docker + AWS CLI | **Terraform**, `dev` / `test` / `prod` workspaces, one-command deploy & destroy | **Terraform**, `azure` / `gcp` workspaces, builds and pushes the image too |
+| **Data** | SQLite or DynamoDB (picked by one env var), every query scoped to the signed-in clinician | Conversations in S3, survive a page refresh | Stateless: code goes to a temp file for Semgrep and is deleted after the scan |
+| **Access control** | Clerk sign-in + paid-subscription gate | Usage limits: 3 messages per visitor per day, 50 site-wide, plus API throttling | No sign-in; OpenAI and Semgrep keys stay server-side |
+| **Write-up** | 📖 [`saas/README.md`](saas/README.md) | 📖 [`twin/README.md`](twin/README.md) | 📓 [`cyber/week3/`](cyber/week3/) guides |
 
 ## 🩺 Project 1 — MediNotes Pro
 
@@ -62,12 +63,30 @@ Next.js 16 static export on S3 + CloudFront  →  API Gateway (throttled)  →  
 
 📖 **Architecture, what I built on top of the course and the production-only bugs: [`twin/README.md`](twin/README.md)**
 
+## 🛡️ Project 3 — Cybersecurity Analyzer
+
+Upload or paste Python code, and an AI security agent reviews it in about 30 seconds. It runs **Semgrep** static analysis through an **MCP server**, then does its own review on top, and returns each issue with the vulnerable snippet, an explanation, a fix, a severity and a **CVSS score**, with the worst issues first.
+
+What I did with it:
+- **Ran the whole agent loop locally.** FastAPI starts a Semgrep MCP server for each request, and an OpenAI Agents SDK agent calls `semgrep_scan` exactly once, then returns a typed `SecurityReport`. On the vulnerable sample [`cyber/airline.py`](cyber/airline.py), Semgrep found 4 issues and the agent found 1 more: an `eval()` call and SQL injection in four places.
+- **Sorted the findings by CVSS**, so the riskiest fix is always at the top of the report.
+- **Packaged it as one container.** A multi-stage Docker build bakes the Next.js static export into the FastAPI image, so a single port serves both the UI and the API.
+- **Prepared one Terraform setup for two clouds.** The `azure` and `gcp` workspaces each build the image for amd64, push it to the cloud's registry, and deploy it to Azure Container Apps or Google Cloud Run with 2 GiB of memory, the amount Semgrep's rule loading needs to avoid being killed.
+
+```
+Next.js 15 static export  →  FastAPI /api/analyze  →  OpenAI Agents SDK (gpt-4.1-mini)
+        Semgrep MCP server (semgrep_scan)  ·  Docker  ·  Terraform → Azure Container Apps / GCP Cloud Run
+```
+
+📓 **Setup and deploy guides: [`cyber/week3/`](cyber/week3/), starting with `day1.part0.md`**
+
 ### 🗺️ What's in this repo
 
 | Folder | What it is |
 |---|---|
 | [`saas/`](saas/) | 🩺 **MediNotes Pro** — the full-stack app above (Next.js + FastAPI + Docker + Lambda) |
 | [`twin/`](twin/) | 🤖 **Digital Twin** — AI chat persona (Next.js + FastAPI + Bedrock, deployed with Terraform) |
+| [`cyber/`](cyber/) | 🛡️ **Cybersecurity Analyzer** — Semgrep MCP + AI agent code scanner (Docker, Terraform for Azure / GCP) |
 | [`instant/`](instant/) | ⚡ Production deploy in under 10 minutes — a single FastAPI file on Vercel |
 | [`finale/`](finale/) | 🤖 Agents on AWS Bedrock AgentCore with Strands (tools, code interpreter, observability) |
 | [`week1/`](week1/) – [`week4/`](week4/) | 📓 The day-by-day guides I worked through |
