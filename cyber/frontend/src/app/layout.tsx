@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Cybersecurity Analyst",
-  description: "Professional Python code analysis tool for cybersecurity analysis",
+  title: "Python Security Scanner",
+  description: "Find vulnerabilities in Python code with Semgrep and an AI security reviewer, and learn how to fix them",
 };
 
 export default function RootLayout({
