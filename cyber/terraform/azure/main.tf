@@ -8,7 +8,7 @@ terraform {
     }
     docker = {
       source  = "kreuzwerker/docker"
-      version = "~> 3.0"
+      version = "3.6.2"
     }
     random = {
       source  = "hashicorp/random"
@@ -45,7 +45,7 @@ data "azurerm_resource_group" "main" {
 resource "azurerm_container_registry" "acr" {
   name                = local.acr_name
   resource_group_name = data.azurerm_resource_group.main.name
-  location            = data.azurerm_resource_group.main.location
+  location            = var.location
   sku                 = "Basic"
   admin_enabled       = true
 
@@ -85,7 +85,7 @@ resource "docker_registry_image" "app" {
 # Create Log Analytics Workspace for monitoring
 resource "azurerm_log_analytics_workspace" "main" {
   name                = "${var.project_name}-logs"
-  location            = data.azurerm_resource_group.main.location
+  location            = var.location
   resource_group_name = data.azurerm_resource_group.main.name
   sku                 = "PerGB2018"
   retention_in_days   = 30
@@ -99,7 +99,7 @@ resource "azurerm_log_analytics_workspace" "main" {
 # Create Container App Environment
 resource "azurerm_container_app_environment" "main" {
   name                       = "${var.project_name}-env"
-  location                   = data.azurerm_resource_group.main.location
+  location                   = var.location
   resource_group_name        = data.azurerm_resource_group.main.name
   log_analytics_workspace_id = azurerm_log_analytics_workspace.main.id
 
