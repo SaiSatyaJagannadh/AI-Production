@@ -39,7 +39,6 @@ Thumbs.db
 *.log
 
 # Docker
-Dockerfile*
 docker-compose*
 .dockerignore
 
