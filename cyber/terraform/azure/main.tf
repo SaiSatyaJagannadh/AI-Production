@@ -8,7 +8,7 @@ terraform {
     }
     docker = {
       source  = "kreuzwerker/docker"
-      version = "3.6.2"
+      version = "~> 3.0"
     }
     random = {
       source  = "hashicorp/random"
@@ -64,22 +64,24 @@ provider "docker" {
   }
 }
 
-# Build and push Docker image
-resource "docker_image" "app" {
-  name = "${azurerm_container_registry.acr.login_server}/${var.project_name}:${var.docker_image_tag}"
-  
-  build {
-    context    = "${path.module}/../.."
-    dockerfile = "Dockerfile"
-    platform   = "linux/amd64"
-    no_cache   = true
+# Build the image with the docker CLI: the provider's own build block sends a
+# corrupted context to Docker Desktop 29 ("unpigz: invalid deflate data").
+# To ship code changes: terraform taint terraform_data.image, then apply.
+resource "terraform_data" "image" {
+  input = "${azurerm_container_registry.acr.login_server}/${var.project_name}:${var.docker_image_tag}"
+
+  provisioner "local-exec" {
+    command = "docker build --platform linux/amd64 -t ${self.input} ${path.module}/../.."
   }
 }
 
+# Push the locally built image to ACR
 resource "docker_registry_image" "app" {
-  name = docker_image.app.name
-  
-  depends_on = [docker_image.app]
+  name = terraform_data.image.output
+
+  lifecycle {
+    replace_triggered_by = [terraform_data.image]
+  }
 }
 
 # Create Log Analytics Workspace for monitoring
