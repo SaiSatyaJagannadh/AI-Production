@@ -86,6 +86,77 @@ The result is **one image** that holds both the UI and the API, served from port
 
 **Why `--platform linux/amd64`?** Your Mac has an Apple (ARM) chip, but Azure runs Intel/AMD-style (amd64) machines. Building for amd64 makes the lunchbox fit Azure's kitchen. The build is slower on an M-series Mac because it runs under emulation.
 
+### Couldn't we skip Docker and deploy the code to Azure directly?
+
+You could. There are two ways:
+
+1. **Azure App Service in "code" mode.** You upload the Python code and Azure installs the packages on its own Python runtime. It would work for this app, but:
+   - Semgrep needs about 2 GB of memory. The cheap B1 tier has only 1.75 GB, so you'd need B2 or higher at a fixed price of tens of dollars a month.
+   - App Service plans **don't scale to zero**, so you pay while nobody visits. The Container App costs $0 while idle (only the roughly $5/month registry is fixed).
+   - The Next.js UI has to be built and uploaded separately.
+2. **Let Azure run Docker for you.** `az containerapp up --source .` uploads the folder and Azure builds the image in the cloud. You don't need Docker on your Mac, but an image is still made.
+
+The course uses Docker because:
+- **Same box everywhere.** Python 3.12, `uv`, Semgrep, the built UI and the backend are frozen into one image, so what you tested locally is exactly what runs on Azure. No "works on my Mac, broken in the cloud".
+- **Portability.** Day 2 deploys the **same image** to Google Cloud Run without changing the app.
+- **Scale to zero.** Container Apps and Cloud Run run images, and that's what lets the app sleep for free.
+
+In lemonade terms: without Docker the park cooks your recipe in its own kitchen. It works, but you rent the kitchen all day and the taste may differ. With Docker you bring a sealed lunchbox that tastes the same everywhere, and the stand only opens when a customer shows up.
+
+### Does Docker have to stay running in production?
+
+**No.** Docker Desktop on your Mac is only needed **while building** the image:
+
+```
+build time  →  Docker Desktop on your Mac builds and pushes the image (a few minutes)
+run time    →  Azure runs the container from the registry (Docker Desktop not involved)
+```
+
+After the push, your Mac can be off. Azure runs the container on its own runtime, wakes it when a visitor arrives, and puts it to sleep when idle.
+
+---
+
+## Automating it with GitLab CI
+
+In a real team nobody builds on their laptop. When you push to `main`, a **GitLab runner** (a temporary build machine) builds the image, pushes it to ACR, and tells Azure to use it:
+
+```
+git push → GitLab runner: docker build → docker push to ACR → az containerapp update → new revision live
+```
+
+A minimal `.gitlab-ci.yml`, placed in the same folder as the `Dockerfile`. In this repo that's `cyber/`. A pipeline at the repo root needs `cd cyber` or `docker build ... cyber`.
+
+```yaml
+stages: [build, deploy]
+
+build:
+  stage: build
+  image: docker:27
+  services: [docker:27-dind]          # Docker inside the runner
+  script:
+    - docker login $ACR_SERVER -u $ACR_USER -p $ACR_PASSWORD
+    - docker build --platform linux/amd64 -t $ACR_SERVER/cyber-analyzer:$CI_COMMIT_SHORT_SHA .
+    - docker push $ACR_SERVER/cyber-analyzer:$CI_COMMIT_SHORT_SHA
+  rules: [{ if: '$CI_COMMIT_BRANCH == "main"' }]
+
+deploy:
+  stage: deploy
+  image: mcr.microsoft.com/azure-cli
+  script:
+    - az login --service-principal -u $AZ_CLIENT_ID -p $AZ_CLIENT_SECRET --tenant $AZ_TENANT_ID
+    - az containerapp update -n cyber-analyzer -g cyber-analyzer-rg
+        --image $ACR_SERVER/cyber-analyzer:$CI_COMMIT_SHORT_SHA
+  rules: [{ if: '$CI_COMMIT_BRANCH == "main"' }]
+```
+
+The `$` values are **GitLab CI/CD variables** (Settings → CI/CD → Variables, marked *masked*): the ACR login, an Azure service principal, and the OpenAI and Semgrep keys. Never commit them to the repo.
+
+**Three changes before switching to CI:**
+
+1. **Split Terraform from the image build.** `main.tf` currently runs `docker build` itself (`terraform_data.image`), which only works on a machine with Docker. With CI, Terraform creates the infrastructure once and the pipeline handles images (`az containerapp update` above).
+2. **Tag images with the commit SHA instead of `:latest`.** Every deploy is then traceable, a rollback means pointing the app at an older tag, and it fixes "Terraform doesn't see code changes".
+3. **Move the Terraform state off your Mac.** Today it lives only in `terraform.tfstate.d/` on your laptop, so a runner wouldn't know what exists. Use an Azure Storage Account backend if CI will ever run `terraform`.
+
 ---
 
 ## What Terraform does here
