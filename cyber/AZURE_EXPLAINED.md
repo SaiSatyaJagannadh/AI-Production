@@ -228,7 +228,7 @@ Terraform keeps a record of what it built in `terraform.tfstate.d/azure/` (on yo
 |---|---|
 | Container registry (Basic) | about $5/month. This is the only thing that bills while idle. |
 | Container App | pay per use, and $0 while scaled to zero |
-| Log Analytics | first 5 GB/month free |
+| Log Analytics | $0: first 5 GB/month free, and `daily_quota_gb = 0.1` in `main.tf` caps it at about 3 GB/month |
 
 When you're done:
 
