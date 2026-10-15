@@ -116,6 +116,40 @@ After the push, your Mac can be off. Azure runs the container on its own runtime
 
 ---
 
+## What Azure actually stores: the image, not your repo
+
+Azure never connects to GitHub or GitLab, and it never sees your repository. It only pulls the **image** from the registry:
+
+```
+GitLab / your Mac  ──build+push──►  ACR (cyberanalyzerncjra3)  ──pull──►  Container App
+```
+
+The Container App only knows the address `cyberanalyzerncjra3.azurecr.io/cyber-analyzer:latest`. Whoever pushes there decides what runs: your Mac today, a GitLab runner later.
+
+The image still **contains your code**, in the form it needs to run:
+
+| Part | In the image? | Form |
+|---|---|---|
+| Backend `backend/*.py` (`server.py`, `context.py`, `mcp_servers.py`) | ✅ yes | **Plain readable Python source.** Python isn't compiled. |
+| Python libraries and Semgrep | ✅ yes | installed packages |
+| Frontend | ✅ only the built output (`out/` → `static/`) | Minified HTML/JS/CSS. The `.tsx` source stays in the first build stage, which is thrown away. |
+| `.env` (API keys) | ❌ no | Excluded by `.dockerignore`. The keys are set as Container App environment variables by Terraform. |
+| `.git` history, `week3/` guides, `terraform/`, `*.md` | ❌ no | excluded by `.dockerignore` |
+
+What that means:
+- Anyone with **pull access to the ACR** can download the image and read `server.py`, but not your git history or `.env`. `admin_enabled = true` means the registry's admin credentials can be read by anyone with access to your subscription.
+- **Visitors** only get the built frontend, which every browser downloads anyway. They can't reach the backend files.
+- **You can't edit code in Azure.** To change it, build and push a new image, and the container is replaced.
+
+### API keys: plain env vars vs secrets
+
+Today `main.tf` passes `OPENAI_API_KEY` and `SEMGREP_APP_TOKEN` as plain `env` values. **That's fine for this course**, and the app works as is. The catch is that anyone who can open the Container App in the Azure Portal (or run `az containerapp show`) can read both keys in plain text.
+
+- **Your own student subscription, demo use:** not required. Don't share access to the subscription, run `terraform destroy` when you're done (that also removes the keys from Azure), and rotate a key in the OpenAI or Semgrep dashboard if you think it leaked.
+- **Shared subscription, GitLab CI, or real production:** store the keys as Container App **secrets** (`secret { }` plus `env { secret_name = ... }` in `main.tf`, which the Portal hides), or in **Azure Key Vault**.
+
+---
+
 ## Automating it with GitLab CI
 
 In a real team nobody builds on their laptop. When you push to `main`, a **GitLab runner** (a temporary build machine) builds the image, pushes it to ACR, and tells Azure to use it:
