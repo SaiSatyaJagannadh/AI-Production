@@ -91,6 +91,7 @@ resource "azurerm_log_analytics_workspace" "main" {
   resource_group_name = data.azurerm_resource_group.main.name
   sku                 = "PerGB2018"
   retention_in_days   = 30
+  daily_quota_gb      = 0.1 // ponytail: hard cap keeps logs inside the 5 GB/month free grant; raise if logs get cut off
 
   tags = {
     environment = terraform.workspace
