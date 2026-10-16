@@ -2,12 +2,12 @@
 
 # 🚀 AI in Production — my build log
 
-### Three Gen AI apps taken toward production: a Docker container on AWS Lambda, a Terraform-managed serverless stack, and an AI security agent packaged for Azure and GCP.
+### Three Gen AI apps taken toward production: a Docker container on AWS Lambda, a Terraform-managed serverless stack, and an AI security agent running on Azure Container Apps.
 
 [![MediNotes Pro](https://img.shields.io/badge/▶_Live-MediNotes_Pro-0e7c74?style=for-the-badge)](https://55ncfzx5whditvl2364jsjk3gy0twvlw.lambda-url.us-east-2.on.aws/)
 [![Digital Twin](https://img.shields.io/badge/▶_Live-Digital_Twin-6C47FF?style=for-the-badge)](https://do2s1pa4farox.cloudfront.net)
 [![AWS Lambda](https://img.shields.io/badge/Running_on-AWS_Lambda-FF9900?style=for-the-badge&logo=awslambda&logoColor=white)](https://aws.amazon.com/lambda/)
-[![Cyber Analyzer](https://img.shields.io/badge/🛡️_Project-Cyber_Analyzer-C62828?style=for-the-badge)](cyber/)
+[![Cyber Analyzer](https://img.shields.io/badge/▶_Live-Cyber_Analyzer-C62828?style=for-the-badge)](https://cyber-analyzer.livelybay-66a7cdf6.mexicocentral.azurecontainerapps.io/)
 [![Terraform](https://img.shields.io/badge/Infra-Terraform-7B42BC?style=for-the-badge&logo=terraform&logoColor=white)](twin/terraform/main.tf)
 
 </div>
@@ -16,7 +16,7 @@
 
 | | 🩺 [MediNotes Pro](saas/README.md) | 🤖 [Digital Twin](twin/README.md) | 🛡️ [Cyber Analyzer](cyber/) |
 |---|---|---|---|
-| **Live** | [lambda-url…on.aws](https://55ncfzx5whditvl2364jsjk3gy0twvlw.lambda-url.us-east-2.on.aws/) | [do2s1pa4farox.cloudfront.net](https://do2s1pa4farox.cloudfront.net) | Runs locally and in Docker; Terraform ready for Azure + GCP |
+| **Live** | [lambda-url…on.aws](https://55ncfzx5whditvl2364jsjk3gy0twvlw.lambda-url.us-east-2.on.aws/) | [do2s1pa4farox.cloudfront.net](https://do2s1pa4farox.cloudfront.net) | [cyber-analyzer…azurecontainerapps.io](https://cyber-analyzer.livelybay-66a7cdf6.mexicocentral.azurecontainerapps.io/) (Azure Container Apps) |
 | **What it does** | Turns a clinician's shorthand into a chart summary, next steps, red flags and a patient email | Answers questions about my background, in my voice, from my real LinkedIn and notes | Scans uploaded Python for vulnerabilities and returns fixes ranked by CVSS score |
 | **Frontend** | Next.js 16 Pages Router, static export, served by the API | Next.js 16 App Router, static export on S3 + CloudFront | Next.js 15 App Router, static export, served by the API |
 | **Backend** | FastAPI streaming SSE | FastAPI JSON API via Mangum | FastAPI + OpenAI Agents SDK, Semgrep as an MCP tool |
@@ -77,6 +77,8 @@ What I did with it:
 Next.js 15 static export  →  FastAPI /api/analyze  →  OpenAI Agents SDK (gpt-4.1-mini)
         Semgrep MCP server (semgrep_scan)  ·  Docker  ·  Terraform → Azure Container Apps / GCP Cloud Run
 ```
+
+▶ **Live: [cyber-analyzer…mexicocentral.azurecontainerapps.io](https://cyber-analyzer.livelybay-66a7cdf6.mexicocentral.azurecontainerapps.io/)**
 
 📓 **Setup and deploy guides: [`cyber/week3/`](cyber/week3/), starting with `day1.part0.md`**
 
