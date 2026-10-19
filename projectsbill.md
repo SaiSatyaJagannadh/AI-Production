@@ -91,6 +91,28 @@ Or open **Cost Management → Cost analysis** in the portal and filter to `cyber
 
 OpenAI usage for both MediNotes and Cyber is at https://platform.openai.com/usage.
 
+## 🔄 Cheaper alternatives (keep the apps live, pay less)
+
+Ordered by how much each saves.
+
+| # | Alternative | Saves | Trade-off |
+|---|---|---|---|
+| 1 | **Host the Cyber image on GitHub Container Registry (ghcr.io) instead of Azure Container Registry.** A public image on ghcr.io is free, and Container Apps can pull it without credentials. Push with `docker push ghcr.io/saisatyajagannadh/cyber-analyzer:latest`, point the Container App's `image` at it, and drop the `azurerm_container_registry` resource from `main.tf`. | **≈ $5/month**, the whole idle bill | The image becomes public. That's fine here: API keys are runtime env vars, not baked into the image, and the code is already in this repo. Docker Hub's free public repos work the same way. |
+| 2 | **Move Cyber to Google Cloud Run.** The `cyber/terraform/gcp` workspace is already written. Cloud Run's free grant is the same as Container Apps' (180k vCPU-seconds, 360k GiB-seconds, 2M requests), and Artifact Registry gives 0.5 GB free, then $0.10/GB-month. | ≈ $4.90/month | The image is likely over 0.5 GB because of Semgrep, so expect a few cents a month. It also means a new link and a new cloud account to look after. |
+| 3 | **Deploy Cyber only when you're showing it.** `terraform destroy` after a demo, `terraform apply` before the next one (about 5–10 minutes). | ≈ $5/month while it's down | The link is dead in between, and the URL may change after each apply. |
+| 4 | **Use a cheaper model for Cyber:** `gpt-5-nano` ($0.05 / $0.40 per 1M tokens) or `gpt-4.1-nano` ($0.10 / $0.40) instead of `gpt-4.1-mini` ($0.40 / $1.60). It's one line in `cyber/backend/server.py`. | 4–8× less per scan | The agent may find fewer extra issues beyond Semgrep's. Run it on `airline.py` before and after to compare. |
+| 5 | **Add an ECR lifecycle policy for MediNotes.** Each push of `:latest` leaves the previous image behind untagged, and every one of them is billed. A rule like "expire untagged images after 1 day" keeps only the live one. | a few cents a month, growing with every deploy | None |
+| 6 | **Delete the old hand-built `twin-api` stack** (CloudFront `d1ozrewa9otrmw`). | cents, plus one less public endpoint | None. The Terraform `twin-dev-api` stack is the live one. |
+
+**With #1 (or #2) and #5, the whole portfolio drops from ≈ $5.10 to ≈ $0.10 per month while idle, and all three links stay live.**
+
+ECR lifecycle rule for #5:
+
+```bash
+aws ecr put-lifecycle-policy --repository-name consultation-app --region us-east-2 \
+  --lifecycle-policy-text '{"rules":[{"rulePriority":1,"description":"expire untagged","selection":{"tagStatus":"untagged","countType":"sinceImagePushed","countUnit":"days","countNumber":1},"action":{"type":"expire"}}]}'
+```
+
 ## ✂️ How to cut the bill to ≈ $0
 
 - **Cyber Analyzer:** `cd cyber/terraform/azure && terraform destroy -var="openai_api_key=$OPENAI_API_KEY" -var="semgrep_app_token=$SEMGREP_APP_TOKEN"` removes the registry and the $5/month with it. Run `terraform apply` again to bring it back.
