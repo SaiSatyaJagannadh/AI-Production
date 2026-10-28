@@ -80,7 +80,28 @@
   .chip { border: 1px solid var(--line-strong); background: transparent; color: var(--muted); border-radius: 999px; padding: 5px 12px; font: inherit; font-size: 13px; cursor: pointer; }
   .chip:hover { color: var(--text); border-color: var(--accent); }
 
-  .features { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; margin: 40px 0 10px; }
+  .alert { display: flex; gap: 14px; align-items: flex-start; border: 1px solid color-mix(in srgb, var(--bad) 50%, transparent); background: var(--bad-bg); border-radius: 16px; padding: 16px 18px; }
+  .alert .ic { flex: none; width: 30px; height: 30px; border-radius: 9px; background: var(--bad); color: #fff; display: grid; place-items: center; font-weight: 800; }
+  .alert b { display: block; }
+  .alert span { color: var(--muted); font-size: 14px; }
+  .rules { margin: 12px 0 0; padding: 10px 12px; border-radius: 12px; background: var(--bg2); font-size: 13px; color: var(--muted); }
+  .rules b { color: var(--text); font-weight: 600; }
+  .actions { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+  .ghost { border: 1px solid var(--line-strong); background: transparent; color: var(--text); border-radius: 10px; padding: 7px 14px; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+  .ghost:hover { border-color: var(--accent); }
+  .checks { display: flex; flex-wrap: wrap; gap: 8px; }
+  .check { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--bg2); }
+  .check.yes { color: var(--good); border-color: color-mix(in srgb, var(--good) 35%, transparent); }
+  .check.no { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 35%, transparent); }
+  .sub { font-size: 12px; color: var(--faint); text-transform: uppercase; letter-spacing: .1em; margin: 16px 0 8px; }
+  .compare { margin-top: 14px; }
+  .compare table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  .compare th, .compare td { padding: 11px 12px; border-bottom: 1px solid var(--line); text-align: left; }
+  .compare th { font-size: 12px; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); font-weight: 600; }
+  .compare td:not(:first-child), .compare th:not(:first-child) { text-align: center; width: 24%; }
+  .compare tr:last-child td { border-bottom: 0; }
+  .y { color: var(--good); font-weight: 700; } .n { color: var(--faint); }
+  .features { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 40px 0 10px; }
   .feature { padding: 14px 12px; border-radius: 14px; border: 1px solid var(--line); background: var(--surface); text-align: center; font-size: 13px; color: var(--muted); }
   .feature b { display: block; color: var(--text); font-size: 13.5px; margin-top: 6px; }
   .feature svg { color: var(--accent); }
@@ -158,7 +179,7 @@
 
   [hidden] { display: none !important; }
   @media (max-width: 860px) {
-    .features { grid-template-columns: repeat(3, 1fr); }
+    .features { grid-template-columns: repeat(2, 1fr); }
     .tiles, .how { grid-template-columns: 1fr 1fr; }
     .two, .comments { grid-template-columns: 1fr; }
   }
@@ -171,6 +192,11 @@
     .verdict { grid-template-columns: 1fr; justify-items: center; text-align: center; }
     .verdict::before { inset: 0 0 auto 0; width: auto; height: 5px; }
     .hide-sm { display: none; }
+  }
+  @media print {
+    header, .hero, #intro, .actions, footer { display: none !important; }
+    body { background: #fff; color: #000; }
+    .card, .tile { box-shadow: none; break-inside: avoid; }
   }
   @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
 </style>
@@ -215,6 +241,21 @@
       <div class="feature"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m16 18 6-6-6-6M8 6l-6 6 6 6"/></svg><b>Semgrep scan</b>Skimmers &amp; scam code</div>
       <div class="feature"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg><b>Reddit</b>Top comments</div>
       <div class="feature"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><b>AI research</b>Reviews on the web</div>
+      <div class="feature"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="m4.9 4.9 14.2 14.2"/></svg><b>Blocklists</b>Malware &amp; phishing feeds</div>
+      <div class="feature"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="9" height="10" rx="2"/><rect x="13" y="7" width="9" height="10" rx="2"/></svg><b>Lookalikes</b>Fake brand domains</div>
+    </div>
+    <div class="card compare">
+      <p class="section-title">Why it's different</p>
+      <table>
+        <thead><tr><th></th><th>Typical checkers</th><th>Cyber Site Analyzer</th></tr></thead>
+        <tbody>
+          <tr><td>Trust score, domain age, SSL, popularity, blocklists</td><td class="y">✓</td><td class="y">✓</td></tr>
+          <tr><td>Reads the site's own code with Semgrep (skimmers, obfuscation, scam payments)</td><td class="n">–</td><td class="y">✓</td></tr>
+          <tr><td>Shows what real people said, straight from Reddit</td><td class="n">–</td><td class="y">✓</td></tr>
+          <tr><td>Catches brand-new scams before anyone reports them (lookalikes, fresh domains)</td><td class="n">–</td><td class="y">✓</td></tr>
+          <tr><td>Every claim backed by evidence and cited sources, with hard safety rules the AI can't override</td><td class="n">–</td><td class="y">✓</td></tr>
+        </tbody>
+      </table>
     </div>
     <div class="how">
       <div class="card"><span class="n">01</span><h3>Collect hard evidence</h3><p>Registry records, the TLS certificate and the live page are checked directly, never guessed.</p></div>
@@ -241,7 +282,7 @@ const VERDICTS = {
   high_risk: { label: "High risk", tone: "bad" },
 };
 const tone = (t) => `--tone: var(--${t}); --tone-bg: var(--${t}-bg);`;
-const STEPS = ["Looking up domain registration", "Checking the SSL certificate", "Fetching the live page", "Scanning scripts with Semgrep", "Reading Reddit discussions", "AI researching reviews on the web"];
+const STEPS = ["Looking up domain registration & popularity", "Checking blocklists and the SSL certificate", "Fetching the live page", "Scanning scripts with Semgrep", "Reading Reddit discussions", "AI researching reviews on the web"];
 
 fetch("/health").then((r) => r.json()).then((d) => { $("#health").textContent = d.message === "Cyber Site Analyzer API" ? "Live" : "Wrong server"; })
   .catch(() => { $("#health").textContent = "Offline"; });
@@ -278,7 +319,20 @@ function tiles(d, r) {
   if (dom.error) out.push(tile("Domain age", "Unknown", dom.error, "warn", "N/A"));
   else {
     const t = dom.age_days >= 365 ? "good" : dom.age_days >= 180 ? "warn" : "bad";
-    out.push(tile("Domain age", age(dom.age_days), `Registered ${dom.created}${dom.registrar ? " · " + dom.registrar : ""}`, t, t === "good" ? "OK" : t === "warn" ? "YOUNG" : "NEW"));
+    out.push(tile("Domain age", age(dom.age_days), `Registered ${dom.created}${dom.registrar ? " · " + dom.registrar : ""}${dom.owner ? " · Owner: " + dom.owner : ""}`, t, t === "good" ? "OK" : t === "warn" ? "YOUNG" : "NEW"));
+  }
+  const pop = d.popularity || {};
+  if (pop.error) out.push(tile("Popularity", "Unknown", pop.error, "warn", "N/A"));
+  else if (pop.rank && pop.rank <= 1000000) out.push(tile("Popularity", `#${pop.rank.toLocaleString()}`, "Tranco rank among the top 1M sites worldwide", pop.rank <= 100000 ? "good" : "ok", pop.rank <= 100000 ? "POPULAR" : "RANKED"));
+  else out.push(tile("Popularity", "Not ranked", "Outside the top 1M sites - normal for small shops, typical of scams", "warn", "LOW"));
+  const bl = d.blocklists || {};
+  if (bl.error) out.push(tile("Blocklists", "Unknown", bl.error, "warn", "N/A"));
+  else {
+    const names = Object.keys(bl.lists || {});
+    const checked = names.filter((n) => bl.lists[n] !== null);
+    out.push(bl.listed_on?.length
+      ? tile("Blocklists", "Listed", bl.listed_on.join(" · "), "bad", "DANGER")
+      : tile("Blocklists", checked.length ? "Clean" : "Unchecked", (checked.length ? checked : names).join(" · "), checked.length ? "good" : "warn", checked.length ? "CLEAN" : "N/A"));
   }
   if (tls.valid) out.push(tile("SSL certificate", "Valid", `${tls.issuer} · ${tls.days_left} days left${tls.organization ? " · " + tls.organization : ""}`, tls.days_left > 7 ? "good" : "warn", "OK"));
   else out.push(tile("SSL certificate", "Invalid", tls.error || "No certificate", "bad", "FAIL"));
@@ -296,7 +350,10 @@ function tiles(d, r) {
   out.push(sg.ran
     ? tile("Semgrep scan", f.length ? `${f.length} finding${f.length === 1 ? "" : "s"}` : "No scam patterns", `${sg.files_scanned} files scanned`, worst, worst === "good" ? "CLEAN" : worst === "warn" ? "REVIEW" : "ALERT")
     : tile("Semgrep scan", "Not run", sg.error || "", "warn", "N/A"));
-  const n = rd.comments?.length || 0, t = (rd.threads?.length || 0) + (r?.reddit_threads?.length || 0);
+  const h = d.hosting || {};
+  out.push(h.error ? tile("Hosting", "Unknown", h.error, "warn", "N/A")
+    : tile("Hosting", h.org || "Unknown", [h.city, h.country].filter(Boolean).join(", ") + (h.asn ? " · " + h.asn : ""), "ok", "INFO"));
+  const n = rd.comments?.length || 0, t =(rd.threads?.length || 0) + (r?.reddit_threads?.length || 0);
   const sentiment = r?.reddit_sentiment || "none";
   const st = { positive: "good", mixed: "warn", negative: "bad", none: "ok" }[sentiment];
   out.push(tile("Reddit", n ? `${n} comment${n === 1 ? "" : "s"}` : t ? `${t} thread${t === 1 ? "" : "s"}` : "Little discussion", sentiment === "none" ? "No clear sentiment" : `Sentiment: ${sentiment}`, st, sentiment.toUpperCase()));
@@ -311,6 +368,8 @@ function render(d) {
   const r = d.report;
   const v = r ? VERDICTS[r.verdict] : null;
   const parts = [];
+  if (d.lookalike) parts.push(`<div class="alert"><span class="ic">!</span><div><b>Possible impersonation of ${esc(d.lookalike.brand)}</b><span>${esc(d.lookalike.reason)}</span></div></div>`);
+  if (d.blocklists?.listed_on?.length) parts.push(`<div class="alert"><span class="ic">!</span><div><b>Flagged as malicious</b><span>Listed on ${esc(d.blocklists.listed_on.join(" and "))}. Don't enter passwords or card details here.</span></div></div>`);
   if (r) {
     const C = 2 * Math.PI * 74, pct = r.trust_score / 100;
     parts.push(`<div class="card verdict" style="${tone(v.tone)}">
@@ -318,7 +377,9 @@ function render(d) {
         <circle cx="85" cy="85" r="74" fill="none" stroke="var(--tone)" stroke-width="12" stroke-linecap="round" stroke-dasharray="${C * pct} ${C}"/></svg>
         <div class="num"><div><b>${r.trust_score}</b><small>trust score</small></div></div></div>
       <div><span class="badge">${v.label}</span><h2>${esc(r.headline)}</h2><p>${esc(r.summary)}</p>
-        <div class="site-line mono">${esc(d.page?.final_url || d.url)}</div></div></div>`);
+        <div class="site-line mono">${esc(d.page?.final_url || d.url)}</div>
+        ${r.adjustments?.length ? `<div class="rules"><b>Safety rules applied</b> (AI score ${r.ai_score}): ${r.adjustments.map(esc).join(" ")}</div>` : ""}
+        <div class="actions"><button class="ghost" type="button" id="share">Copy share link</button><button class="ghost" type="button" onclick="window.print()">Save as PDF</button></div></div></div>`);
   } else {
     parts.push(`<div class="card error"><b>No AI verdict.</b> ${esc(d.report_error)}</div>`);
   }
@@ -327,8 +388,21 @@ function render(d) {
       <div class="card"><p class="section-title">What looks good</p>${points(r.positives, "pos", "✓", "Nothing stood out.")}</div>
       <div class="card"><p class="section-title">Red flags</p>${points(r.concerns, "neg", "!", "No red flags found.")}</div></div>`);
 
+  const pg = d.page || {};
+  if (pg.policies) {
+    const labels = { returns: "Returns / refunds", shipping: "Shipping info", privacy: "Privacy policy", terms: "Terms", contact: "Contact / support", about: "About us" };
+    const pol = Object.entries(pg.policies).map(([k, ok]) => `<span class="check ${ok ? "yes" : "no"}">${ok ? "✓" : "✗"} ${labels[k] || esc(k)}</span>`).join("");
+    const pay = (pg.payments || []).map((p) => `<span class="check yes">${esc(p)}</span>`).join("");
+    parts.push(`<div class="card"><p class="section-title">Store checks <span class="count">linked from the homepage</span></p>
+      <div class="checks">${pol}</div>
+      <p class="sub">Protected payment methods shown</p>
+      <div class="checks">${pay || `<span class="empty">None detected on the homepage - check at checkout that cards or PayPal are accepted.</span>`}</div></div>`);
+  } else if (pg.status && !pg.error) {
+    parts.push(`<div class="card"><p class="section-title">Store checks</p><p class="empty">This homepage is drawn by JavaScript, so its policy links and payment badges can't be read without a browser. Look for returns and contact pages yourself before buying.</p></div>`);
+  }
+
   const rd = d.reddit || {};
-  const comments = (rd.comments || []).map((c) => `<div class="comment"><div class="meta"><span class="score">▲ ${c.score}</span><span>r/${esc(c.subreddit)}</span><span>${esc(c.date)}</span></div><p>${esc(c.body)}</p><a href="${href(c.url)}" target="_blank" rel="noopener noreferrer">View on Reddit →</a></div>`).join("");
+  const comments =(rd.comments || []).map((c) => `<div class="comment"><div class="meta"><span class="score">▲ ${c.score}</span><span>r/${esc(c.subreddit)}</span><span>${esc(c.date)}</span></div><p>${esc(c.body)}</p><a href="${href(c.url)}" target="_blank" rel="noopener noreferrer">View on Reddit →</a></div>`).join("");
   const seen = new Set((rd.threads || []).map((t) => t.url.split("?")[0]));
   const found = (r?.reddit_threads || []).filter((t) => /^https:\/\/(www\.|old\.)?reddit\.com\//i.test(t.url) && !seen.has(t.url.split("?")[0]));
   const threads = (rd.threads || []).map((t) => `<a class="thread" href="${href(t.url)}" target="_blank" rel="noopener noreferrer">${esc(t.title)}<span>r/${esc(t.subreddit)} · ▲ ${t.score} · ${t.comments} comments</span></a>`)
@@ -352,6 +426,11 @@ function render(d) {
   const report = $("#report");
   report.innerHTML = parts.join("");
   report.hidden = false;
+  $("#share")?.addEventListener("click", async (e) => {
+    const link = `${location.origin}/?site=${encodeURIComponent(d.host)}`;
+    try { await navigator.clipboard.writeText(link); e.target.textContent = "Link copied ✓"; }
+    catch { prompt("Copy this link", link); }
+  });
 }
 
 async function analyze(site) {

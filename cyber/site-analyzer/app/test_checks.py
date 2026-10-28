@@ -3,10 +3,10 @@
 import shutil
 
 from checks import (
-    UnsafeTarget, brand_label, check_public, domain_candidates, normalize,
-    parse_page, parse_rdap, pick_comments, semgrep_scan,
+    UnsafeTarget, brand_label, check_public, domain_candidates, lookalike, normalize,
+    parse_page, parse_rdap, pick_comments, registrable, semgrep_scan,
 )
-from server import verdict_for
+from server import guardrails, verdict_for
 
 
 def raises(fn, exc=ValueError):
@@ -68,6 +68,40 @@ raw = [
 picked = pick_comments(raw, "temu")
 assert [c["score"] for c in picked] == [9, 5, 80], picked  # shopper experiences first, then mere mentions
 assert picked[0]["url"] == "https://www.reddit.com/r/y/4"
+
+# registrable domain and lookalikes: impersonators flagged, the real brands and innocent names left alone
+assert registrable("shop.allbirds.co.uk") == "allbirds.co.uk" and registrable("www.temu.com") == "temu.com"
+for fake in ["amaz0n.com", "paypa1-secure.net", "nike-outlet.shop", "amazon.shop", "walmartt.com", "rnetflix.com",
+             "apple-support-login.com", "coinbasse.com"]:
+    assert lookalike(fake, None), fake
+for real in ["amazon.com", "www.paypal.com", "applebees.com", "pineapple.com", "my-office-supplies.com",
+             "allbirds.com", "chasefarm.org"]:
+    assert lookalike(real, None) is None, real
+assert lookalike("amazon.co.uk", 700) is None  # popular regional site, not an impersonator
+
+# store signals from the homepage
+shop = parse_page(
+    """<title>Shop</title><a href="/pages/refund-policy">Refunds</a><a href="/privacy">Privacy</a><a href="/x">Contact us</a>
+    <a href="/">Home</a><a href="/c">Catalog</a>
+    <img alt="Visa"><svg><title>PayPal</title></svg><span aria-label="Apple Pay"></span><p>Pay later with Klarna</p>""",
+    "https://shop.example.com/",
+)
+assert shop["title"] == "Shop"  # the icon's <title> is not the page title
+assert shop["policies"] == {"returns": True, "shipping": False, "privacy": True, "terms": False, "contact": True, "about": False}
+assert shop["payments"] == ["Apple Pay", "Klarna", "PayPal", "Visa"], shop["payments"]
+assert parse_page("<div id=root></div><a href=/>x</a>", "https://spa.example.com/")["policies"] is None
+
+rdap_private = parse_rdap({"entities": [{"roles": ["registrant"], "vcardArray": ["vcard", [["org", {}, "text", "REDACTED FOR PRIVACY"]]]}]})
+assert rdap_private["owner"] == "Hidden (privacy service)"
+
+# guardrails: hard caps the model can't override, and a floor for very popular clean sites
+ev = {"blocklists": {"listed_on": ["OpenPhish"]}, "domain": {"age_days": 12}, "tls": {"valid": True}, "semgrep": {"findings": []}}
+score, notes = guardrails(ev, 90)
+assert score == 15 and len(notes) == 1, (score, notes)  # 35 cap for age is already beaten by the 15 cap
+assert guardrails({"domain": {"age_days": 100}}, 80)[0] == 60
+assert guardrails({"popularity": {"rank": 431}, "domain": {"age_days": 8000}}, 40) == (65, guardrails({"popularity": {"rank": 431}}, 40)[1])
+assert guardrails({"popularity": {"rank": 431}, "lookalike": {"brand": "x.com"}}, 40)[0] == 25
+assert guardrails({}, 72) == (72, [])
 
 # the verdict comes from the score bands, never the model's wording
 assert [verdict_for(s) for s in (100, 85, 84, 65, 64, 40, 39, 0)] == [
