@@ -14,6 +14,8 @@ Ed Donner's "AI in Production" course repo. Most of it is **instructional markdo
 | `finale/` | Strands agents on AWS Bedrock AgentCore, `uv` project | AWS (`agentcore launch`) |
 | `cyber/` | Next.js App Router static export + FastAPI, OpenAI Agents SDK + Semgrep MCP (week 3) | Docker → Azure Container Apps / GCP Cloud Run via Terraform |
 
+`cyber/site-analyzer/` is a separate app inside that folder: **Cyber Site Analyzer**, a "is this website legit?" checker (FastAPI + one static HTML page, OpenAI Agents SDK with web search, Semgrep CLI with custom rules in `app/rules.yml`). Its `README.md` has the details. It deploys **only to Google Cloud Run** (`terraform/gcp`, workspace `gcp`, project `cyber-analyzer-sites-513003`). Never deploy it to Azure: the user wants Azure to hold only the cyber-analyzer stack. Run it locally on port 8001, and self-check with `cd cyber/site-analyzer/app && uv run python test_checks.py`.
+
 `week3/` points at `ed-donner/cyber`, which is now vendored here as `cyber/` — plain files, its `.git` removed, so Ed's updates no longer arrive by `git pull`. It has its own `cyber/CLAUDE.md`; read that before working there. `week4/` still points at another repo (`alex`), with no code here.
 
 **`twin/`, `saas/` and `cyber/` backends all default to port 8000.** Two can be up at once on macOS (one bound to `127.0.0.1`, one to `0.0.0.0`), and `localhost` then silently reaches the wrong app — a frontend gets 404s from an API that answers `/health` fine. Run `lsof -nP -iTCP:8000 -sTCP:LISTEN` before debugging.
