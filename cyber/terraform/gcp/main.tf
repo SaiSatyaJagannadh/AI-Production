@@ -61,9 +61,10 @@ resource "docker_image" "app" {
 
   build {
     context    = "${path.module}/../.."
-    dockerfile = "Dockerfile"
+    dockerfile = "${path.module}/../../Dockerfile" # buildx resolves this from the cwd, not the context
     platform   = "linux/amd64"
     no_cache   = true
+    builder    = "default" # buildx; the legacy builder fails on Docker 29 with "unpigz ... invalid deflate data"
   }
 
   depends_on = [
