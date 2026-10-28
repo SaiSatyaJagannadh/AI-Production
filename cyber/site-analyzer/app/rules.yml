@@ -1,0 +1,90 @@
+# Semgrep rules for "is this website trustworthy?" - run against the fetched page
+# (page.html) and its scripts (*.js). They flag patterns common on scam shops,
+# phishing pages and card skimmers, not code-quality issues.
+rules:
+  - id: obfuscated-code-executed
+    languages: [javascript]
+    severity: ERROR
+    message: >-
+      Code is decoded and executed at runtime. Legitimate sites rarely do this; card
+      skimmers and malicious redirects use it to hide what they run.
+    pattern-either:
+      - pattern: eval(atob(...))
+      - pattern: eval(unescape(...))
+      - pattern: eval(decodeURIComponent(...))
+      - pattern: eval(String.fromCharCode(...))
+      - pattern: new Function(atob(...))
+      - pattern: document.write(unescape(...))
+      - pattern: document.write(atob(...))
+
+  - id: card-data-sent-offsite
+    languages: [javascript]
+    severity: ERROR
+    message: >-
+      Script reads card-number style fields and sends data with an image beacon or
+      WebSocket - the shape of a Magecart-style skimmer.
+    patterns:
+      - pattern-either:
+          - pattern: (new Image()).src = $X
+          - pattern: new WebSocket(...)
+      - pattern-inside: |
+          function $F(...) { ... }
+      - metavariable-regex:
+          metavariable: $F
+          regex: (?i).*(card|cvv|billing|payment).*
+
+  - id: untraceable-payment-method
+    languages: [regex]
+    severity: WARNING
+    paths:
+      include: ["*.html"]
+    message: >-
+      The page asks for an irreversible payment method (wire, gift card, crypto,
+      Zelle/Western Union). Real shops take cards or PayPal, which carry buyer protection.
+    pattern-regex: >-
+      (?i)\b(western\s+union|moneygram|zelle\s+only|pay\s+(with|via|in|using)\s+(bitcoin|crypto|usdt|gift\s*cards?)|gift\s*cards?\s+(as|for)\s+payment|bank\s+transfer\s+only|wire\s+transfer\s+only)\b
+
+  - id: crypto-wallet-address
+    languages: [regex]
+    severity: WARNING
+    paths:
+      include: ["*.html"]
+    message: A cryptocurrency wallet address appears in the page itself, which is unusual for a store.
+    pattern-regex: \b(bc1[ac-hj-np-z02-9]{25,59}|0x[a-fA-F0-9]{40})\b
+
+  - id: form-posts-over-http
+    languages: [regex]
+    severity: WARNING
+    paths:
+      include: ["*.html"]
+    message: A form submits to an unencrypted http:// address, so anything typed into it travels in clear text.
+    pattern-regex: (?i)<form[^>]*\baction\s*=\s*["']?http://
+
+  - id: hidden-iframe
+    languages: [regex]
+    severity: WARNING
+    paths:
+      include: ["*.html"]
+    message: An invisible iframe loads another page - a classic way to load trackers or malware unseen.
+    # analytics tags (Google Tag Manager, Meta pixel...) ship a hidden <noscript> iframe on almost every shop
+    pattern-regex: (?i)<iframe(?![^>]*(googletagmanager|facebook\.com/tr|doubleclick|bing\.com|hotjar))[^>]*(width\s*=\s*["']?0["'\s>]|height\s*=\s*["']?0["'\s>]|display\s*:\s*none|visibility\s*:\s*hidden)
+
+  - id: extreme-discount-pressure
+    languages: [regex]
+    severity: INFO
+    paths:
+      include: ["*.html"]
+    message: >-
+      Very deep discounts or "closing down" urgency - the most common hook used by
+      short-lived fake stores.
+    pattern-regex: (?i)(\b(8[5-9]|9[0-9])\s*%\s*off\b|closing[\s-]+down\s+sale|liquidation\s+sale|store\s+closing\s+sale|clearance\s+sale.{0,30}\b(8[5-9]|9[0-9])\s*%)
+
+  - id: copy-protection-tricks
+    languages: [regex]
+    severity: INFO
+    paths:
+      include: ["*.html"]
+    message: >-
+      Right-click or text selection is disabled. Fake stores use this to stop shoppers
+      copying product photos into a reverse image search.
+    pattern-regex: (?i)(oncontextmenu\s*=\s*["']?\s*return\s+false|onselectstart\s*=\s*["']?\s*return\s+false|onkeydown\s*=\s*["']?\s*return\s+false)
