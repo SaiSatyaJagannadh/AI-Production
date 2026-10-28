@@ -1,0 +1,386 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cyber Site Analyzer</title>
+<meta name="description" content="Is this website legit? Domain age, SSL, live page, Semgrep scam-pattern scan, Reddit comments and AI web research in one verdict.">
+<meta property="og:title" content="Cyber Site Analyzer - is this website legit?">
+<meta property="og:description" content="Paste any shop or link. Get a trust score from domain age, SSL, Semgrep, Reddit and AI web research.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path fill='%2322d3ee' d='M12 2 4 5v6c0 5 3.4 9.4 8 11 4.6-1.6 8-6 8-11V5z'/></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #070b16; --bg2: #0c1324; --surface: rgba(17, 25, 45, .72); --surface-solid: #111a2e;
+    --line: rgba(148, 163, 184, .14); --line-strong: rgba(148, 163, 184, .28);
+    --text: #e6edf7; --muted: #8b9ab3; --faint: #5b6b85;
+    --accent: #22d3ee; --accent2: #a78bfa; --accent-ink: #04121a;
+    --good: #22c55e; --ok: #14b8a6; --warn: #f59e0b; --bad: #ef4444;
+    --good-bg: rgba(34, 197, 94, .12); --ok-bg: rgba(20, 184, 166, .12); --warn-bg: rgba(245, 158, 11, .12); --bad-bg: rgba(239, 68, 68, .12);
+    --grid: rgba(148, 163, 184, .06); --shadow: 0 20px 60px -20px rgba(0, 0, 0, .6);
+    color-scheme: dark;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f5f7fb; --bg2: #eef2f8; --surface: rgba(255, 255, 255, .85); --surface-solid: #fff;
+      --line: rgba(15, 23, 42, .09); --line-strong: rgba(15, 23, 42, .18);
+      --text: #0f172a; --muted: #52607a; --faint: #8492a8;
+      --accent: #0891b2; --accent2: #7c3aed; --accent-ink: #fff;
+      --good: #16a34a; --ok: #0d9488; --warn: #d97706; --bad: #dc2626;
+      --grid: rgba(15, 23, 42, .045); --shadow: 0 20px 50px -24px rgba(15, 23, 42, .25);
+      color-scheme: light;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 15px/1.6 Inter, system-ui, -apple-system, Segoe UI, sans-serif;
+    background-image:
+      radial-gradient(900px 500px at 15% -10%, color-mix(in srgb, var(--accent) 16%, transparent), transparent 70%),
+      radial-gradient(700px 500px at 95% 5%, color-mix(in srgb, var(--accent2) 14%, transparent), transparent 70%),
+      linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+    background-size: auto, auto, 44px 44px, 44px 44px;
+    min-height: 100vh;
+  }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 20px; }
+  .mono { font-family: "JetBrains Mono", ui-monospace, monospace; }
+
+  header { display: flex; align-items: center; justify-content: space-between; padding: 22px 0; }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; letter-spacing: -.01em; color: var(--text); }
+  .brand:hover { text-decoration: none; }
+  .logo { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center;
+    background: linear-gradient(135deg, var(--accent), var(--accent2)); color: var(--accent-ink); box-shadow: 0 6px 20px -6px var(--accent); }
+  .pill { font-size: 12px; color: var(--muted); border: 1px solid var(--line-strong); border-radius: 999px; padding: 4px 10px; display: inline-flex; gap: 6px; align-items: center; }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--good); box-shadow: 0 0 0 3px var(--good-bg); }
+
+  .hero { text-align: center; padding: 48px 0 24px; }
+  .eyebrow { display: inline-block; font-size: 12px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--accent); margin-bottom: 14px; }
+  h1 { font-size: clamp(34px, 6vw, 58px); line-height: 1.05; letter-spacing: -.035em; margin: 0 0 16px; font-weight: 800; }
+  h1 span { background: linear-gradient(90deg, var(--accent), var(--accent2)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .lede { color: var(--muted); font-size: 17px; max-width: 620px; margin: 0 auto 30px; }
+
+  form.search { display: flex; gap: 10px; max-width: 680px; margin: 0 auto; padding: 8px; border-radius: 18px;
+    background: var(--surface); border: 1px solid var(--line-strong); box-shadow: var(--shadow); backdrop-filter: blur(12px); }
+  .field { flex: 1; display: flex; align-items: center; gap: 10px; padding: 0 12px; min-width: 0; }
+  .field svg { color: var(--faint); flex: none; }
+  .field input { flex: 1; min-width: 0; background: transparent; border: 0; outline: 0; color: var(--text); font: inherit; font-size: 16px; padding: 12px 0; }
+  .field input::placeholder { color: var(--faint); }
+  form.search:focus-within { border-color: var(--accent); box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 18%, transparent), var(--shadow); }
+  .btn { border: 0; border-radius: 12px; padding: 12px 22px; font: inherit; font-weight: 600; cursor: pointer; white-space: nowrap;
+    background: linear-gradient(135deg, var(--accent), var(--accent2)); color: var(--accent-ink); transition: transform .15s, opacity .15s; }
+  .btn:hover { transform: translateY(-1px); }
+  .btn:disabled { opacity: .55; cursor: progress; transform: none; }
+  .btn:focus-visible, .chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 16px; color: var(--faint); font-size: 13px; align-items: center; }
+  .chip { border: 1px solid var(--line-strong); background: transparent; color: var(--muted); border-radius: 999px; padding: 5px 12px; font: inherit; font-size: 13px; cursor: pointer; }
+  .chip:hover { color: var(--text); border-color: var(--accent); }
+
+  .features { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; margin: 40px 0 10px; }
+  .feature { padding: 14px 12px; border-radius: 14px; border: 1px solid var(--line); background: var(--surface); text-align: center; font-size: 13px; color: var(--muted); }
+  .feature b { display: block; color: var(--text); font-size: 13.5px; margin-top: 6px; }
+  .feature svg { color: var(--accent); }
+
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 20px; padding: 24px; box-shadow: var(--shadow); backdrop-filter: blur(12px); }
+  .section-title { font-size: 13px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin: 0 0 14px; display: flex; align-items: center; gap: 8px; }
+  .section-title .count { letter-spacing: 0; text-transform: none; font-weight: 500; color: var(--faint); }
+
+  #status { max-width: 680px; margin: 28px auto 0; }
+  .steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+  .steps li { display: flex; gap: 12px; align-items: center; color: var(--faint); transition: color .3s; }
+  .steps li.active { color: var(--text); }
+  .steps li.done { color: var(--muted); }
+  .tick { width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--line-strong); display: grid; place-items: center; flex: none; font-size: 12px; }
+  .active .tick { border-color: var(--accent); border-top-color: transparent; animation: spin .8s linear infinite; }
+  .done .tick { border-color: var(--good); background: var(--good-bg); color: var(--good); }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .error { border-color: color-mix(in srgb, var(--bad) 45%, transparent); background: var(--bad-bg); color: var(--text); }
+
+  #report { margin-top: 34px; display: grid; gap: 18px; }
+  .verdict { display: grid; grid-template-columns: 180px 1fr; gap: 28px; align-items: center; position: relative; overflow: hidden; }
+  .verdict::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 5px; background: var(--tone); }
+  .gauge { position: relative; width: 170px; height: 170px; }
+  .gauge svg { transform: rotate(-90deg); }
+  .gauge .num { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; }
+  .gauge .num b { font-size: 46px; font-weight: 800; letter-spacing: -.03em; line-height: 1; }
+  .gauge .num small { display: block; color: var(--muted); font-size: 12px; margin-top: 4px; }
+  .badge { display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 999px; font-weight: 700; font-size: 13px; letter-spacing: .04em; text-transform: uppercase; color: var(--tone); background: var(--tone-bg); }
+  .verdict h2 { font-size: clamp(20px, 3vw, 26px); line-height: 1.25; letter-spacing: -.02em; margin: 12px 0 10px; }
+  .verdict p { color: var(--muted); margin: 0 0 12px; }
+  .site-line { font-size: 13px; color: var(--faint); word-break: break-all; }
+
+  .tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  .tile { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 16px 18px; border-top: 3px solid var(--tone); }
+  .tile .k { font-size: 12px; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); display: flex; justify-content: space-between; align-items: center; }
+  .tile .v { font-size: 20px; font-weight: 700; margin: 6px 0 2px; letter-spacing: -.01em; }
+  .tile .s { font-size: 13px; color: var(--muted); word-break: break-word; }
+  .state { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; color: var(--tone); background: var(--tone-bg); letter-spacing: .04em; }
+
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  ul.points { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+  ul.points li { display: flex; gap: 10px; align-items: flex-start; }
+  ul.points .ic { flex: none; width: 22px; height: 22px; border-radius: 7px; display: grid; place-items: center; font-size: 13px; font-weight: 700; margin-top: 1px; }
+  .pos .ic { background: var(--good-bg); color: var(--good); }
+  .neg .ic { background: var(--warn-bg); color: var(--warn); }
+  .adv .ic { background: color-mix(in srgb, var(--accent) 15%, transparent); color: var(--accent); }
+  .empty { color: var(--faint); font-size: 14px; }
+
+  .comments { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+  .comment { border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; background: var(--bg2); display: flex; flex-direction: column; gap: 8px; }
+  .comment .meta { display: flex; gap: 10px; font-size: 12px; color: var(--faint); align-items: center; flex-wrap: wrap; }
+  .comment .score { color: #ff6a33; font-weight: 700; }
+  .comment p { margin: 0; font-size: 14px; color: var(--text); display: -webkit-box; -webkit-line-clamp: 6; -webkit-box-orient: vertical; overflow: hidden; white-space: pre-line; }
+  .threads { display: grid; gap: 8px; margin-top: 14px; }
+  .thread { display: flex; justify-content: space-between; gap: 12px; font-size: 14px; padding: 10px 14px; border-radius: 12px; border: 1px solid var(--line); }
+  .thread span { color: var(--faint); font-size: 12px; white-space: nowrap; }
+  .sentiment { margin: -4px 0 14px; color: var(--muted); }
+
+  .findings { display: grid; gap: 10px; }
+  .finding { border: 1px solid var(--line); border-left: 3px solid var(--tone); border-radius: 12px; padding: 12px 14px; }
+  .finding .top { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; font-size: 13px; }
+  .finding .msg { color: var(--muted); font-size: 14px; margin: 6px 0; }
+  .finding code { display: block; font-size: 12px; background: var(--bg2); border-radius: 8px; padding: 8px 10px; overflow-x: auto; white-space: pre; color: var(--muted); }
+
+  .sources { display: flex; flex-wrap: wrap; gap: 8px; }
+  .sources a { font-size: 13px; border: 1px solid var(--line-strong); padding: 6px 12px; border-radius: 999px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .meta-row { display: flex; justify-content: space-between; gap: 12px; color: var(--faint); font-size: 12.5px; flex-wrap: wrap; }
+
+  .how { margin: 54px 0 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  .how .card { padding: 20px; }
+  .how h3 { margin: 6px 0 6px; font-size: 16px; }
+  .how p { margin: 0; color: var(--muted); font-size: 14px; }
+  .how .n { font-size: 12px; color: var(--accent); font-weight: 700; letter-spacing: .1em; }
+  footer { margin: 56px 0 30px; padding-top: 22px; border-top: 1px solid var(--line); color: var(--faint); font-size: 13px; display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+
+  [hidden] { display: none !important; }
+  @media (max-width: 860px) {
+    .features { grid-template-columns: repeat(3, 1fr); }
+    .tiles, .how { grid-template-columns: 1fr 1fr; }
+    .two, .comments { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 560px) {
+    .wrap { padding: 0 16px; }
+    form.search { flex-direction: column; }
+    .btn { width: 100%; }
+    .tiles, .how { grid-template-columns: 1fr; }
+    .features { grid-template-columns: repeat(2, 1fr); }
+    .verdict { grid-template-columns: 1fr; justify-items: center; text-align: center; }
+    .verdict::before { inset: 0 0 auto 0; width: auto; height: 5px; }
+    .hide-sm { display: none; }
+  }
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <a class="brand" href="/">
+      <span class="logo"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg></span>
+      Cyber Site Analyzer
+    </a>
+    <span class="pill"><span class="dot"></span><span id="health">Live</span></span>
+  </header>
+
+  <section class="hero">
+    <span class="eyebrow">Website trust check</span>
+    <h1>Is this website <span>legit?</span></h1>
+    <p class="lede">Paste a shop, a link from an ad, or any site you're unsure about. We check its domain, certificate, live page, scam patterns, Reddit and the wider web, then give you a trust score.</p>
+    <form class="search" id="form" autocomplete="off">
+      <label class="field">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15 15 0 0 1 0 20M12 2a15 15 0 0 0 0 20"/></svg>
+        <input id="url" name="url" type="text" inputmode="url" spellcheck="false" placeholder="e.g. allbirds.com or https://shop.example.com" aria-label="Website address" required maxlength="2048">
+      </label>
+      <button class="btn" id="go" type="submit">Analyze site</button>
+    </form>
+    <div class="chips">Try:
+      <button class="chip" type="button" data-site="amazon.com">amazon.com</button>
+      <button class="chip" type="button" data-site="allbirds.com">allbirds.com</button>
+      <button class="chip" type="button" data-site="temu.com">temu.com</button>
+      <button class="chip" type="button" data-site="shein.com">shein.com</button>
+    </div>
+  </section>
+
+  <section id="status" hidden></section>
+  <section id="report" hidden></section>
+
+  <section id="intro">
+    <div class="features">
+      <div class="feature"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg><b>Domain age</b>RDAP registry</div>
+      <div class="feature"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg><b>SSL certificate</b>Issuer &amp; expiry</div>
+      <div class="feature"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18"/></svg><b>Live page</b>Redirects &amp; headers</div>
+      <div class="feature"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m16 18 6-6-6-6M8 6l-6 6 6 6"/></svg><b>Semgrep scan</b>Skimmers &amp; scam code</div>
+      <div class="feature"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg><b>Reddit</b>Top comments</div>
+      <div class="feature"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><b>AI research</b>Reviews on the web</div>
+    </div>
+    <div class="how">
+      <div class="card"><span class="n">01</span><h3>Collect hard evidence</h3><p>Registry records, the TLS certificate and the live page are checked directly, never guessed.</p></div>
+      <div class="card"><span class="n">02</span><h3>Scan &amp; listen</h3><p>Semgrep runs custom rules for skimmers and scam payment tricks; Reddit shows what real people said.</p></div>
+      <div class="card"><span class="n">03</span><h3>Weigh it all</h3><p>An AI agent searches for reviews and scam reports, then scores trust from 0 to 100.</p></div>
+    </div>
+  </section>
+
+  <footer>
+    <span>Automated signals, not a guarantee - a high score doesn't mean every seller on a marketplace is honest.</span>
+    <span>OpenAI Agents SDK · Semgrep · FastAPI · Google Cloud Run &amp; Azure</span>
+  </footer>
+</div>
+
+<script>
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+const href = (u) => (/^https?:\/\//i.test(u || "") ? esc(u) : "#");
+
+const VERDICTS = {
+  trusted: { label: "Trusted", tone: "good" },
+  likely_safe: { label: "Likely safe", tone: "ok" },
+  caution: { label: "Use caution", tone: "warn" },
+  high_risk: { label: "High risk", tone: "bad" },
+};
+const tone = (t) => `--tone: var(--${t}); --tone-bg: var(--${t}-bg);`;
+const STEPS = ["Looking up domain registration", "Checking the SSL certificate", "Fetching the live page", "Scanning scripts with Semgrep", "Reading Reddit discussions", "AI researching reviews on the web"];
+
+fetch("/health").then((r) => r.json()).then((d) => { $("#health").textContent = d.message === "Cyber Site Analyzer API" ? "Live" : "Wrong server"; })
+  .catch(() => { $("#health").textContent = "Offline"; });
+
+function age(days) {
+  if (days == null) return "Unknown";
+  if (days < 60) return `${days} days`;
+  if (days < 730) return `${Math.round(days / 30)} months`;
+  return `${Math.floor(days / 365)} years`;
+}
+
+function showSteps() {
+  const status = $("#status");
+  status.hidden = false;
+  status.innerHTML = `<div class="card"><p class="section-title">Analyzing - usually 20-60 seconds</p><ul class="steps">${STEPS.map((s) => `<li><span class="tick"></span>${s}</li>`).join("")}</ul></div>`;
+  const items = [...status.querySelectorAll("li")];
+  let i = 0;
+  items[0].classList.add("active");
+  return setInterval(() => {
+    if (i >= items.length - 1) return; // the last step stays active until the answer lands
+    items[i].classList.replace("active", "done");
+    items[i].querySelector(".tick").textContent = "✓";
+    items[++i].classList.add("active");
+  }, 4500);
+}
+
+function tile(key, value, sub, t, state) {
+  return `<div class="tile" style="${tone(t)}"><div class="k">${key}<span class="state">${state}</span></div><div class="v">${esc(value)}</div><div class="s">${esc(sub)}</div></div>`;
+}
+
+function tiles(d, r) {
+  const dom = d.domain || {}, tls = d.tls || {}, page = d.page || {}, sg = d.semgrep || {}, rd = d.reddit || {};
+  const out = [];
+  if (dom.error) out.push(tile("Domain age", "Unknown", dom.error, "warn", "N/A"));
+  else {
+    const t = dom.age_days >= 365 ? "good" : dom.age_days >= 180 ? "warn" : "bad";
+    out.push(tile("Domain age", age(dom.age_days), `Registered ${dom.created}${dom.registrar ? " · " + dom.registrar : ""}`, t, t === "good" ? "OK" : t === "warn" ? "YOUNG" : "NEW"));
+  }
+  if (tls.valid) out.push(tile("SSL certificate", "Valid", `${tls.issuer} · ${tls.days_left} days left${tls.organization ? " · " + tls.organization : ""}`, tls.days_left > 7 ? "good" : "warn", "OK"));
+  else out.push(tile("SSL certificate", "Invalid", tls.error || "No certificate", "bad", "FAIL"));
+  if (page.error) out.push(tile("Live page", "Unreachable", page.error, "warn", "N/A"));
+  else {
+    const blocked = page.status === 403 || page.status === 429;
+    const t = page.status < 400 ? "good" : blocked ? "ok" : "warn";
+    out.push(tile("Live page", blocked ? "Blocks bots" : `HTTP ${page.status}`, page.title || (blocked ? "Normal for big retailers" : page.final_url), t, page.status < 400 ? "OK" : blocked ? "INFO" : "WARN"));
+    const sec = [page.https ? "HTTPS" : "No HTTPS", page.hsts && "HSTS", page.csp && "CSP"].filter(Boolean).join(" · ");
+    const redirects = page.redirects?.length || 0;
+    out.push(tile("Connection", sec, `${redirects} redirect${redirects === 1 ? "" : "s"}${page.forms_posting_elsewhere?.length ? " · forms post to " + page.forms_posting_elsewhere.join(", ") : ""}`, page.https ? "good" : "bad", page.https ? "OK" : "RISK"));
+  }
+  const f = sg.findings || [];
+  const worst = f.some((x) => x.severity === "ERROR") ? "bad" : f.some((x) => x.severity === "WARNING") ? "warn" : "good";
+  out.push(sg.ran
+    ? tile("Semgrep scan", f.length ? `${f.length} finding${f.length === 1 ? "" : "s"}` : "No scam patterns", `${sg.files_scanned} files scanned`, worst, worst === "good" ? "CLEAN" : worst === "warn" ? "REVIEW" : "ALERT")
+    : tile("Semgrep scan", "Not run", sg.error || "", "warn", "N/A"));
+  const n = rd.comments?.length || 0, t = (rd.threads?.length || 0) + (r?.reddit_threads?.length || 0);
+  const sentiment = r?.reddit_sentiment || "none";
+  const st = { positive: "good", mixed: "warn", negative: "bad", none: "ok" }[sentiment];
+  out.push(tile("Reddit", n ? `${n} comment${n === 1 ? "" : "s"}` : t ? `${t} thread${t === 1 ? "" : "s"}` : "Little discussion", sentiment === "none" ? "No clear sentiment" : `Sentiment: ${sentiment}`, st, sentiment.toUpperCase()));
+  return `<div class="tiles">${out.join("")}</div>`;
+}
+
+function points(items, cls, icon, empty) {
+  return items?.length ? `<ul class="points ${cls}">${items.map((p) => `<li><span class="ic">${icon}</span><span>${esc(p)}</span></li>`).join("")}</ul>` : `<p class="empty">${empty}</p>`;
+}
+
+function render(d) {
+  const r = d.report;
+  const v = r ? VERDICTS[r.verdict] : null;
+  const parts = [];
+  if (r) {
+    const C = 2 * Math.PI * 74, pct = r.trust_score / 100;
+    parts.push(`<div class="card verdict" style="${tone(v.tone)}">
+      <div class="gauge"><svg width="170" height="170" viewBox="0 0 170 170"><circle cx="85" cy="85" r="74" fill="none" stroke="var(--line-strong)" stroke-width="12"/>
+        <circle cx="85" cy="85" r="74" fill="none" stroke="var(--tone)" stroke-width="12" stroke-linecap="round" stroke-dasharray="${C * pct} ${C}"/></svg>
+        <div class="num"><div><b>${r.trust_score}</b><small>trust score</small></div></div></div>
+      <div><span class="badge">${v.label}</span><h2>${esc(r.headline)}</h2><p>${esc(r.summary)}</p>
+        <div class="site-line mono">${esc(d.page?.final_url || d.url)}</div></div></div>`);
+  } else {
+    parts.push(`<div class="card error"><b>No AI verdict.</b> ${esc(d.report_error)}</div>`);
+  }
+  parts.push(tiles(d, r));
+  if (r) parts.push(`<div class="two">
+      <div class="card"><p class="section-title">What looks good</p>${points(r.positives, "pos", "✓", "Nothing stood out.")}</div>
+      <div class="card"><p class="section-title">Red flags</p>${points(r.concerns, "neg", "!", "No red flags found.")}</div></div>`);
+
+  const rd = d.reddit || {};
+  const comments = (rd.comments || []).map((c) => `<div class="comment"><div class="meta"><span class="score">▲ ${c.score}</span><span>r/${esc(c.subreddit)}</span><span>${esc(c.date)}</span></div><p>${esc(c.body)}</p><a href="${href(c.url)}" target="_blank" rel="noopener noreferrer">View on Reddit →</a></div>`).join("");
+  const seen = new Set((rd.threads || []).map((t) => t.url.split("?")[0]));
+  const found = (r?.reddit_threads || []).filter((t) => /^https:\/\/(www\.|old\.)?reddit\.com\//i.test(t.url) && !seen.has(t.url.split("?")[0]));
+  const threads = (rd.threads || []).map((t) => `<a class="thread" href="${href(t.url)}" target="_blank" rel="noopener noreferrer">${esc(t.title)}<span>r/${esc(t.subreddit)} · ▲ ${t.score} · ${t.comments} comments</span></a>`)
+    .concat(found.map((t) => `<a class="thread" href="${href(t.url)}" target="_blank" rel="noopener noreferrer">${esc(t.title || t.url)}<span>found by web search</span></a>`)).join("");
+  parts.push(`<div class="card"><p class="section-title">What Reddit says <span class="count">top comments mentioning ${esc(d.host)}</span></p>
+    ${r?.reddit_summary ? `<p class="sentiment">${esc(r.reddit_summary)}</p>` : ""}
+    ${comments ? `<div class="comments">${comments}</div>` : threads ? "" : `<p class="empty">${esc(rd.error || "No Reddit comments mention this domain.")}</p>`}
+    ${threads ? `<div class="threads">${threads}</div>` : ""}</div>`);
+
+  const f = d.semgrep?.findings || [];
+  const sevTone = { ERROR: "bad", WARNING: "warn", INFO: "ok" };
+  parts.push(`<div class="card"><p class="section-title">Semgrep scam-pattern scan <span class="count">${d.semgrep?.ran ? `${d.semgrep.files_scanned} files: page + scripts` : esc(d.semgrep?.error || "")}</span></p>
+    ${f.length ? `<div class="findings">${f.map((x) => `<div class="finding" style="${tone(sevTone[x.severity] || "ok")}"><div class="top"><span class="state">${esc(x.severity)}</span><b class="mono">${esc(x.rule)}</b><span class="mono" style="color:var(--faint)">${esc(x.file)}:${x.line}</span></div><div class="msg">${esc(x.message)}</div>${x.snippet ? `<code class="mono">${esc(x.snippet)}</code>` : ""}</div>`).join("")}</div>`
+      : `<p class="empty">${d.semgrep?.ran ? "No skimmer, obfuscation or scam-payment patterns matched." : "Scan did not run."}</p>`}</div>`);
+
+  if (r) parts.push(`<div class="two">
+      <div class="card"><p class="section-title">Before you buy</p>${points(r.advice, "adv", "→", "")}</div>
+      <div class="card"><p class="section-title">Sources the AI checked</p>${r.sources?.length ? `<div class="sources">${r.sources.map((s) => `<a href="${href(s.url)}" target="_blank" rel="noopener noreferrer" title="${esc(s.url)}">${esc(s.title || s.url)}</a>`).join("")}</div>` : `<p class="empty">No web sources returned.</p>`}</div></div>`);
+  parts.push(`<div class="meta-row"><span>Checked ${esc(d.host)} · ${esc((d.ips || []).slice(0, 2).join(", "))}</span><span>${d.seconds}s</span></div>`);
+
+  const report = $("#report");
+  report.innerHTML = parts.join("");
+  report.hidden = false;
+}
+
+async function analyze(site) {
+  const go = $("#go");
+  go.disabled = true;
+  go.textContent = "Analyzing…";
+  $("#report").hidden = true;
+  $("#intro").hidden = true;
+  const timer = showSteps();
+  try {
+    const res = await fetch("/api/analyze", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: site }) });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.detail || `The server answered ${res.status}.`);
+    $("#status").hidden = true;
+    render(data);
+    history.replaceState(null, "", `?site=${encodeURIComponent(site)}`);
+  } catch (e) {
+    $("#status").innerHTML = `<div class="card error"><b>Couldn't analyze that site.</b> ${esc(e.message === "Failed to fetch" ? "The analyzer is unreachable - check your connection and try again." : e.message)}</div>`;
+  } finally {
+    clearInterval(timer);
+    go.disabled = false;
+    go.textContent = "Analyze site";
+  }
+}
+
+$("#form").addEventListener("submit", (e) => { e.preventDefault(); const v = $("#url").value.trim(); if (v) analyze(v); });
+document.querySelectorAll(".chip").forEach((c) => c.addEventListener("click", () => { $("#url").value = c.dataset.site; analyze(c.dataset.site); }));
+const shared = new URLSearchParams(location.search).get("site");
+if (shared) { $("#url").value = shared; analyze(shared); }
+</script>
+</body>
+</html>
