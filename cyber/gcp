@@ -2,3 +2,9 @@ This will be created for the gcp, gale is down
 
 
 cyber-analyzer-sites --- We creating the sites we scan now 
+
+
+running app -- https://cyber-analyzer-t7r47ckxwq-uc.a.run.app/
+
+
+https://console.cloud.google.com/run/detail/us-central1/cyber-analyzer/observability/metrics?authuser=1&project=cyber-analyzer-sites-513003&supportedpurview=project,folder
