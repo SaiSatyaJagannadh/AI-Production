@@ -1,6 +1,6 @@
 # 🔎 Cyber Site Analyzer
 
-**Live 👉 https://cyber-site-analyzer-t7r47ckxwq-uc.a.run.app**
+**Live 👉 https://cyber-site-analyzer-549044732956.us-central1.run.app**
 
 **Is this website legit?** Paste a shop, a link from an ad, or any site you're unsure about, and get a
 0–100 trust score with the evidence behind it. It sits beside the week 3 Cybersecurity Analyzer

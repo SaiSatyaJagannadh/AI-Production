@@ -9,7 +9,7 @@
 [![AWS Lambda](https://img.shields.io/badge/Running_on-AWS_Lambda-FF9900?style=for-the-badge&logo=awslambda&logoColor=white)](https://aws.amazon.com/lambda/)
 [![Cyber Analyzer](https://img.shields.io/badge/▶_Live-Cyber_Analyzer-C62828?style=for-the-badge)](https://cyber-analyzer.livelybay-66a7cdf6.mexicocentral.azurecontainerapps.io/)
 [![Azure](https://img.shields.io/badge/Running_on-Azure_Container_Apps-0078D4?style=for-the-badge&logo=microsoftazure&logoColor=white)](cyber/AZURE_EXPLAINED.md)
-[![Cyber Site Analyzer](https://img.shields.io/badge/▶_Live-Cyber_Site_Analyzer-0891B2?style=for-the-badge)](https://cyber-site-analyzer-t7r47ckxwq-uc.a.run.app)
+[![Cyber Site Analyzer](https://img.shields.io/badge/▶_Live-Cyber_Site_Analyzer-0891B2?style=for-the-badge)](https://cyber-site-analyzer-549044732956.us-central1.run.app)
 [![Google Cloud Run](https://img.shields.io/badge/Running_on-Google_Cloud_Run-4285F4?style=for-the-badge&logo=googlecloud&logoColor=white)](cyber/site-analyzer/README.md)
 [![Terraform](https://img.shields.io/badge/Infra-Terraform-7B42BC?style=for-the-badge&logo=terraform&logoColor=white)](twin/terraform/main.tf)
 
@@ -19,7 +19,7 @@
 
 | | 🩺 [MediNotes Pro](saas/README.md) | 🤖 [Digital Twin](twin/README.md) | 🛡️ [Cyber Analyzer](cyber/AZURE_EXPLAINED.md) | 🔎 [Cyber Site Analyzer](cyber/site-analyzer/README.md) |
 |---|---|---|---|---|
-| **Live** | [lambda-url…on.aws](https://55ncfzx5whditvl2364jsjk3gy0twvlw.lambda-url.us-east-2.on.aws/) | [do2s1pa4farox.cloudfront.net](https://do2s1pa4farox.cloudfront.net) | [cyber-analyzer…azurecontainerapps.io](https://cyber-analyzer.livelybay-66a7cdf6.mexicocentral.azurecontainerapps.io/) | [cyber-site-analyzer…run.app](https://cyber-site-analyzer-t7r47ckxwq-uc.a.run.app) |
+| **Live** | [lambda-url…on.aws](https://55ncfzx5whditvl2364jsjk3gy0twvlw.lambda-url.us-east-2.on.aws/) | [do2s1pa4farox.cloudfront.net](https://do2s1pa4farox.cloudfront.net) | [cyber-analyzer…azurecontainerapps.io](https://cyber-analyzer.livelybay-66a7cdf6.mexicocentral.azurecontainerapps.io/) | [cyber-site-analyzer…run.app](https://cyber-site-analyzer-549044732956.us-central1.run.app) |
 | **What it does** | Turns a clinician's shorthand into a chart summary, next steps, red flags and a patient email | Answers questions about my background, in my voice, from my real LinkedIn and notes | Scans uploaded Python for vulnerabilities and returns fixes ranked by CVSS score | Tells you if a website is legit: a 0–100 trust score from domain age, blocklists, lookalike detection, a Semgrep scan of the site's own code, Reddit comments and cited web reviews |
 | **Frontend** | Next.js 16 Pages Router, static export, served by the API | Next.js 16 App Router, static export on S3 + CloudFront | Next.js 15 App Router, static export, served by the API | One static HTML page with no build step, served by the API |
 | **Backend** | FastAPI streaming SSE | FastAPI JSON API via Mangum | FastAPI + OpenAI Agents SDK, Semgrep as an MCP tool | FastAPI + OpenAI Agents SDK with web search; Semgrep CLI with custom scam/skimmer rules |
@@ -89,7 +89,7 @@ Next.js 15 static export  →  FastAPI /api/analyze  →  OpenAI Agents SDK (gpt
 
 ## 🔎 Project 4 — Cyber Site Analyzer
 
-**Live 👉 https://cyber-site-analyzer-t7r47ckxwq-uc.a.run.app**
+**Live 👉 https://cyber-site-analyzer-549044732956.us-central1.run.app**
 
 Paste a shop, a link from an ad, or any website you're unsure about. About 20 seconds later you get a **0–100 trust score** with the evidence behind it. I built it after looking at what ScamAdviser and URLVoid do. They score sites from reputation data, so **a brand-new scam slips through until someone reports it**. This one also collects evidence that needs no reports:
 
@@ -148,7 +148,7 @@ I just shipped four AI apps to production. Not notebooks: four live URLs on thre
 🔹 Terraform builds the container, pushes it to Azure Container Registry and deploys it to Azure Container Apps, which scales to zero when idle
 
 🔎 **Cyber Site Analyzer** tells you whether a website is legit before you buy from it.
-👉 https://cyber-site-analyzer-t7r47ckxwq-uc.a.run.app
+👉 https://cyber-site-analyzer-549044732956.us-central1.run.app
 🔹 Domain age, blocklists, fake-brand detection, a Semgrep scan of the site's own code, top Reddit comments and AI-researched reviews with sources
 🔹 Hard guardrails the AI can't override: it scored a PayPal lookalike "likely safe", and the rules capped it at "high risk"
 
